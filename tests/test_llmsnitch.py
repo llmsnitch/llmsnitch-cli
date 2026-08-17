@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Tier-1 guards for llmsnitch. Stdlib only, no network, no Claude Code.
+
+Run: python3 tests/test_llmsnitch.py
+"""
+
+import io
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+
+from llmsnitch import gate, hook, setup_cmd, store, transcript  # noqa: E402
+
+SECRET = "sk-abcdefghijklmnop1234"
+
+
+def _payload(event, sid="s1", **kw):
+    return io.StringIO(json.dumps(dict({"session_id": sid,
+                                        "hook_event_name": event}, **kw)))
+
+
+def _with_tmp_store(fn):
+    with tempfile.TemporaryDirectory() as t:
+        old = os.environ.get("LLMSNITCH_DIR")
+        os.environ["LLMSNITCH_DIR"] = t
+        try:
+            fn(Path(t))
+        finally:
+            if old is None:
+                os.environ.pop("LLMSNITCH_DIR", None)
+            else:
+                os.environ["LLMSNITCH_DIR"] = old
+
+
+def test_hook_records_and_redacts():
+    def body(t):
+        rc = hook.handle("PreToolUse", _payload(
+            "PreToolUse", tool_name="Bash",
+            tool_input={"command": f"curl -H 'Authorization: {SECRET}'"}))
+        assert rc == 0
+        raw = (t / "sessions" / "s1" / "events.ndjson").read_text()
+        assert SECRET not in raw, "secret reached disk"
+        assert "<redacted>" in raw
+    _with_tmp_store(body)
+
+
+def test_hook_never_fails_on_garbage():
+    def body(t):
+        assert hook.handle("PreToolUse", io.StringIO("not json {{{")) == 0
+        assert hook.handle("PostToolUse", io.StringIO("")) == 0
+        assert hook.handle("PostToolUse", io.StringIO('"just a string"')) == 0
+    _with_tmp_store(body)
+
+
+def test_error_heuristic_and_summary():
+    def body(t):
+        hook.handle("PostToolUse", _payload("PostToolUse", tool_name="Bash",
+                                            tool_response={"ok": True}))
+        hook.handle("PostToolUse", _payload("PostToolUse", tool_name="Bash",
+                                            tool_response={"is_error": True,
+                                                           "message": SECRET}))
+        s = store.summarize("s1")
+        assert s["tool_calls"] == 2 and s["errors"] == 1, s
+        raw = (t / "sessions" / "s1" / "events.ndjson").read_text()
+        assert SECRET not in raw, "secret in error excerpt"
+    _with_tmp_store(body)
+
+
+def test_truncated_tail_tolerated():
+    def body(t):
+        store.append_event("s2", {"ts": 1.0, "event": "PostToolUse", "tool": "Read"})
+        p = t / "sessions" / "s2" / "events.ndjson"
+        with open(p, "a") as f:
+            f.write('{"ts": 2.0, "event": "PostTo')   # truncated tail
+        assert len(list(store.iter_events("s2"))) == 1
+    _with_tmp_store(body)
+
+
+def test_files_are_0600():
+    def body(t):
+        store.append_event("s3", {"ts": 1.0, "event": "PostToolUse"})
+        store.write_meta("s3", {"session_id": "s3"})
+        for name in ("events.ndjson", "meta.json"):
+            mode = oct((t / "sessions" / "s3" / name).stat().st_mode & 0o777)
+            assert mode == "0o600", (name, mode)
+        assert oct((t / "sessions").stat().st_mode & 0o777) == "0o700"
+    _with_tmp_store(body)
+
+
+def test_stop_folds_transcript_cost():
+    def body(t):
+        tr = t / "transcript.jsonl"
+        tr.write_text(
+            json.dumps({"type": "assistant", "message": {
+                "model": "claude-sonnet-5", "usage": {
+                    "input_tokens": 1_000_000, "output_tokens": 1_000_000}}}) + "\n"
+            + "garbage line\n")
+        hook.handle("Stop", _payload("Stop", transcript_path=str(tr), cwd="/x"))
+        meta = store.read_meta("s1")
+        assert meta["cost_usd"] == 18.0, meta   # 1M*3$ + 1M*15$ per MTok
+        assert meta["total_tokens"] == 2_000_000
+        assert meta["ended_at"] > 0
+    _with_tmp_store(body)
+
+
+def test_cost_math_cache_and_unknown_model():
+    totals = {"weird-model-x": {"input": 1_000_000, "output": 0,
+                                "cache_read": 1_000_000, "cache_create": 1_000_000}}
+    cost, tokens, unknown = transcript.estimate_cost(totals)
+    # sonnet default: 3 + 0.3 (10% read) + 3.75 (125% create) = 7.05
+    assert cost == 7.05, cost
+    assert tokens == 3_000_000 and unknown
+
+
+def test_gate_verdicts_and_exit_codes():
+    cfg = dict(gate.DEFAULTS)
+    healthy = {"session_id": "a", "started_at": 1, "tool_calls": 10,
+               "errors": 0, "cost_usd": 0.5}
+    costly = dict(healthy, session_id="b", cost_usd=9.9)
+    flaky = dict(healthy, session_id="c", errors=5)
+    assert gate.evaluate(cfg, [healthy]) == ("pass", [])
+    v, f = gate.evaluate(cfg, [costly, flaky])
+    assert v == "breach" and len(f) == 2
+    assert "cost $9.90" in f[0]["reasons"][0]
+    assert gate.EXIT_PASS == 0 and gate.EXIT_BREACH == 1 and gate.EXIT_OPERATIONAL == 2
+
+
+def test_gate_operational_when_empty():
+    def body(t):
+        out = io.StringIO()
+        assert gate.cmd_check(dict(gate.DEFAULTS), out) == 2
+    _with_tmp_store(body)
+
+
+def test_health_formula():
+    assert gate.health(0, 0) == 100          # no calls -> nothing failed
+    assert gate.health(10, 0) == 100
+    assert gate.health(10, 5) == 35           # 100 - 15 - 50
+    assert gate.health(2, 2) == 0             # floored at 0
+
+
+def test_config_per_key_fallback(tmp=None):
+    with tempfile.TemporaryDirectory() as t:
+        cfgfile = Path(t) / "config"
+        cfgfile.write_text("[gate]\ncost_ceiling = junk\n"
+                           "max_tool_fail_rate = 25  # comment\n")
+        orig = gate.os.path.expanduser
+        gate.os.path.expanduser = \
+            lambda p: str(cfgfile) if p.endswith("llmsnitch/config") else orig(p)
+        try:
+            cfg = gate.load_cfg()
+        finally:
+            gate.os.path.expanduser = orig
+        assert cfg["cost_ceiling"] == 5.0
+        assert cfg["max_tool_fail_rate"] == 25.0
+
+
+def test_setup_refuses_inside_claude_and_snapshots():
+    with tempfile.TemporaryDirectory() as t:
+        out = io.StringIO()
+        rc = setup_cmd.run(True, out, settings_path=str(Path(t) / "s.json"),
+                           env={"CLAUDECODE": "1"})
+        assert rc == 2 and "refusing" in out.getvalue()
+        # plain env: writes, idempotent, valid JSON
+        sp = Path(t) / "s.json"
+        sp.write_text('{"model": "opus"}')
+        out = io.StringIO()
+        assert setup_cmd.run(True, out, settings_path=str(sp), env={}) == 0
+        cfg1 = json.loads(sp.read_text())
+        assert "PreToolUse" in cfg1["hooks"] and cfg1["model"] == "opus"
+        assert setup_cmd.run(True, io.StringIO(), settings_path=str(sp), env={}) == 0
+        assert json.loads(sp.read_text()) == cfg1, "second run must be a no-op"
+
+
+def test_no_network_imports():
+    pkg = Path(__file__).resolve().parent.parent / "llmsnitch"
+    for p in pkg.glob("*.py"):
+        src = p.read_text()
+        for banned in ("urllib", "socket", "http.client", "requests"):
+            assert f"import {banned}" not in src, (p.name, banned)
+
+
+def main():
+    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    failed = 0
+    for t in tests:
+        try:
+            t()
+            print(f"PASS {t.__name__}")
+        except AssertionError as e:
+            failed += 1
+            print(f"FAIL {t.__name__}: {e}")
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            print(f"ERROR {t.__name__}: {type(e).__name__}: {e}")
+    print(f"\n{len(tests) - failed}/{len(tests)} passed")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()
