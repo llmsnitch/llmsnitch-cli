@@ -13,10 +13,12 @@ import json
 # Matched by substring of the model id, first hit wins.
 PRICING = [
     ("opus", 15.0, 75.0),
-    ("fable", 15.0, 75.0),
     ("sonnet", 3.0, 15.0),
     ("haiku", 0.80, 4.0),
 ]
+# Fable, and any future model, has no entry until Anthropic publishes rates —
+# fall to _DEFAULT (sonnet-tier) with an "unknown model" note. Cheaper to
+# under-report than to invent a price.
 _DEFAULT = (3.0, 15.0)  # unknown model -> sonnet-tier estimate, flagged in output
 
 

@@ -55,11 +55,19 @@ cost_ceiling = 5.00        # dollars per session (transcript estimate)
 max_tool_fail_rate = 15    # percent
 health_floor = 70          # health = max(0, 100 - 3*errors - fail_rate)
 range = latest             # latest | today | all
+billing_mode = subscription  # subscription | per_token
 ```
 
 Cost comes from the Claude Code transcript's own `usage` records, priced by
 the table in `transcript.py` — an offline estimate you can edit, not a
 metered bill.
+
+**`billing_mode`** — most users are on Claude Max/Pro and don't pay per token.
+In `subscription` mode (default) the cost figure is labeled as an estimate
+(`~$X`) and the cost gate is disabled — errors and health still gate. Switch
+to `per_token` for pass-through billing, and the cost ceiling enforces.
+Anthropic hasn't published Fable pricing; unknown models fall to sonnet-tier
+with a note rather than an invented rate.
 
 ## Test
 

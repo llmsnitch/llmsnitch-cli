@@ -22,6 +22,7 @@ DEFAULTS = {
     "max_tool_fail_rate": 15.0,  # percent
     "health_floor": 70,          # 0-100
     "range": "latest",           # latest | today | all
+    "billing_mode": "subscription",  # subscription | per_token
 }
 
 CONFIG_PATH = "~/.config/llmsnitch/config"
@@ -77,7 +78,10 @@ def evaluate(cfg, summaries):
         rate = round(s["errors"] * 100.0 / s["tool_calls"], 1) if s["tool_calls"] else 0.0
         h = health(s["tool_calls"], s["errors"])
         cost = s.get("cost_usd")
-        if cost is not None and cost > cfg["cost_ceiling"]:
+        # Skip cost breach on subscription plans — the number is a
+        # theoretical per-token equivalent, not what Anthropic bills.
+        if (cost is not None and cost > cfg["cost_ceiling"]
+                and cfg["billing_mode"] == "per_token"):
             reasons.append(f"cost ${cost:.2f} > ${cfg['cost_ceiling']:.2f}")
         if rate > cfg["max_tool_fail_rate"]:
             reasons.append(f"tool-fail {rate}% > {cfg['max_tool_fail_rate']}%")
@@ -103,8 +107,10 @@ def cmd_check(cfg, out):
 
     verdict, findings = evaluate(cfg, summaries)
     if verdict == "pass":
+        mode_note = (" [subscription: cost gate disabled]"
+                     if cfg["billing_mode"] == "subscription" else "")
         out.write(f"[OK] {len(summaries)} session(s) under thresholds "
-                  f"(range={cfg['range']})\n")
+                  f"(range={cfg['range']}){mode_note}\n")
         return EXIT_PASS
     for f in findings:
         out.write(f"[CRITICAL] session {f['session_id'][:12]}: "

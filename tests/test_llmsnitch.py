@@ -118,7 +118,7 @@ def test_cost_math_cache_and_unknown_model():
 
 
 def test_gate_verdicts_and_exit_codes():
-    cfg = dict(gate.DEFAULTS)
+    cfg = dict(gate.DEFAULTS, billing_mode="per_token")
     healthy = {"session_id": "a", "started_at": 1, "tool_calls": 10,
                "errors": 0, "cost_usd": 0.5}
     costly = dict(healthy, session_id="b", cost_usd=9.9)
@@ -128,6 +128,31 @@ def test_gate_verdicts_and_exit_codes():
     assert v == "breach" and len(f) == 2
     assert "cost $9.90" in f[0]["reasons"][0]
     assert gate.EXIT_PASS == 0 and gate.EXIT_BREACH == 1 and gate.EXIT_OPERATIONAL == 2
+
+
+def test_subscription_mode_skips_cost_breach():
+    """Cost gate is per-token only — subscription plans aren't billed the
+    theoretical per-token equivalent, so a $916 session shouldn't page you."""
+    cfg = dict(gate.DEFAULTS, billing_mode="subscription")
+    assert cfg["billing_mode"] == "subscription"   # default is subscription
+    costly = {"session_id": "b", "started_at": 1, "tool_calls": 10,
+              "errors": 0, "cost_usd": 916.41}
+    assert gate.evaluate(cfg, [costly]) == ("pass", [])
+    # Error-rate and health gates still fire regardless of billing mode.
+    flaky = dict(costly, errors=5)
+    v, f = gate.evaluate(cfg, [flaky])
+    assert v == "breach"
+    assert not any("cost" in r for r in f[0]["reasons"])
+
+
+def test_fable_falls_to_unknown_default():
+    """Fable pricing is unpublished — the table must not invent a rate."""
+    totals = {"claude-fable-5": {"input": 1_000_000, "output": 1_000_000,
+                                 "cache_read": 0, "cache_create": 0}}
+    cost, tokens, unknown = transcript.estimate_cost(totals)
+    assert unknown, "fable must trigger unknown-model note, not an invented price"
+    # Sonnet-tier fallback: 3 + 15 = 18 per MTok
+    assert cost == 18.0, cost
 
 
 def test_gate_operational_when_empty():

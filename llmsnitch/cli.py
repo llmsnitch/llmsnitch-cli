@@ -13,6 +13,14 @@ from datetime import datetime
 from . import __version__, gate, hook, setup_cmd, store
 
 
+def _cost_label(cost, subscription):
+    """Label a cost figure honestly. Subscription mode: bracket it as an
+    estimate the user isn't actually billed for."""
+    if cost is None:
+        return "-"
+    return f"~${cost:.2f}" if subscription else f"${cost:.2f}"
+
+
 def _fmt_ts(ts):
     return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else "-"
 
@@ -22,15 +30,22 @@ def cmd_list(out):
     if not rows:
         out.write("no sessions recorded yet — run `llmsnitch setup`\n")
         return 0
+    cfg = gate.load_cfg()
+    subscription = cfg["billing_mode"] == "subscription"
+    header_cost = "EST.COST" if subscription else "COST"
     out.write(f"{'ID':<14} {'STARTED':<17} {'TOOLS':>5} {'ERR':>4} "
-              f"{'HEALTH':>6} {'COST':>8}  ENDED\n")
+              f"{'HEALTH':>6} {header_cost:>9}  ENDED\n")
     for sid, _ in rows:
         s = store.summarize(sid)
         h = gate.health(s["tool_calls"], s["errors"])
-        cost = f"${s['cost_usd']:.2f}" if s.get("cost_usd") is not None else "-"
+        cost = _cost_label(s.get("cost_usd"), subscription)
         out.write(f"{sid[:14]:<14} {_fmt_ts(s['started_at']):<17} "
-                  f"{s['tool_calls']:>5} {s['errors']:>4} {h:>6} {cost:>8}  "
+                  f"{s['tool_calls']:>5} {s['errors']:>4} {h:>6} {cost:>9}  "
                   f"{'yes' if s['ended'] else 'live'}\n")
+    if subscription:
+        out.write("note: est.cost = per-token equivalent; "
+                  "subscription plans are not billed this. "
+                  "Set [gate] billing_mode = per_token to enforce.\n")
     return 0
 
 
@@ -45,8 +60,16 @@ def cmd_show(sid, out):
               f"tools     {s['tool_calls']} calls, {s['errors']} errors, "
               f"health {gate.health(s['tool_calls'], s['errors'])}\n")
     if s.get("cost_usd") is not None:
-        out.write(f"cost      ${s['cost_usd']:.4f} "
-                  f"({s.get('total_tokens', 0)} tokens)\n")
+        cfg = gate.load_cfg()
+        subscription = cfg["billing_mode"] == "subscription"
+        prefix = "est.cost" if subscription else "cost    "
+        tilde = "~" if subscription else ""
+        out.write(f"{prefix}  {tilde}${s['cost_usd']:.4f} "
+                  f"({s.get('total_tokens', 0)} tokens)"
+                  + (" — subscription plans not billed this\n"
+                     if subscription else "\n"))
+        if s.get("cost_note"):
+            out.write(f"          {s['cost_note']}\n")
     if s["tools"]:
         top = sorted(s["tools"].items(), key=lambda kv: -kv[1])
         out.write("by tool   " + ", ".join(f"{k}={v}" for k, v in top[:8]) + "\n")
