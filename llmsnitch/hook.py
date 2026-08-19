@@ -14,13 +14,20 @@ import sys
 from . import store, transcript
 
 # Common credential shapes. Redaction happens at capture time — a secret that
-# never lands on disk can't leak later.
+# never lands on disk can't leak later. Patterns are chosen for high
+# specificity: a false negative (missed secret) is worse than a false
+# positive (redacted innocuous string), so shapes with too-generic
+# alphabets (e.g. bare 52-char base32, indistinguishable from hex hashes)
+# are intentionally not included until a safer heuristic exists.
 _SECRET = re.compile(
-    r"(sk-[A-Za-z0-9_-]{8,}"        # OpenAI/Anthropic-style keys
-    r"|gh[pousr]_[A-Za-z0-9]{10,}"  # GitHub tokens
-    r"|xox[baprs]-[A-Za-z0-9-]{10,}"  # Slack tokens
-    r"|AKIA[0-9A-Z]{16}"            # AWS access key ids
-    r"|eyJ[A-Za-z0-9_-]{40,})"      # JWTs
+    r"(sk-[A-Za-z0-9_-]{8,}"                    # OpenAI / Anthropic (sk-, sk-ant-*)
+    r"|gh[pousr]_[A-Za-z0-9]{10,}"              # GitHub tokens
+    r"|xox[baprs]-[A-Za-z0-9-]{10,}"            # Slack tokens
+    r"|AKIA[0-9A-Z]{16}"                        # AWS access key ids
+    r"|eyJ[A-Za-z0-9_-]{40,}"                   # JWTs
+    r"|Bearer\s+[A-Za-z0-9._~+/=-]{20,}"        # HTTP Authorization: Bearer
+    r"|-----BEGIN[ A-Z]*PRIVATE KEY-----"       # PEM/OpenSSH private key headers
+    r")"
 )
 
 _MAX_STR = 2000   # per-string cap: traces are for auditing, not archiving blobs

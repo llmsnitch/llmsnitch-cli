@@ -49,6 +49,30 @@ def test_hook_records_and_redacts():
     _with_tmp_store(body)
 
 
+def test_redactor_covers_bearer_and_pem():
+    """Extended credential shapes seen in real agent traffic —
+    Authorization: Bearer headers and inline PEM private keys."""
+    bearer = "Bearer abcdef.1234567890_ghijklmnop-qrstuv"
+    pem = "-----BEGIN OPENSSH PRIVATE KEY-----"
+    ant = "sk-ant-api03-" + "x" * 40
+    def body(t):
+        hook.handle("PreToolUse", _payload(
+            "PreToolUse", tool_name="Bash",
+            tool_input={"command": f"curl -H 'Authorization: {bearer}'"}))
+        hook.handle("PreToolUse", _payload(
+            "PreToolUse", tool_name="Write",
+            tool_input={"content": f"key.txt\n{pem}\nAAAA..."}))
+        hook.handle("PreToolUse", _payload(
+            "PreToolUse", tool_name="Bash",
+            tool_input={"command": f"export ANTHROPIC_API_KEY={ant}"}))
+        raw = (t / "sessions" / "s1" / "events.ndjson").read_text()
+        assert bearer not in raw, "Bearer token reached disk"
+        assert pem not in raw, "PEM header reached disk"
+        assert ant not in raw, "Anthropic key reached disk"
+        assert raw.count("<redacted>") >= 3
+    _with_tmp_store(body)
+
+
 def test_hook_never_fails_on_garbage():
     def body(t):
         assert hook.handle("PreToolUse", io.StringIO("not json {{{")) == 0
