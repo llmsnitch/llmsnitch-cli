@@ -12,6 +12,11 @@ An alert-producing subsystem: `fs-coil-light`, `fs-coil-deep`,
 `session-shed`, `agent-flick`, or a future watcher.
 _Avoid_: source, channel, tool
 
+**Outlet**:
+A consumption path a decided notification reaches the user through:
+Notification Center, `fs-coil noise`, the daily digest, the TUI badge.
+_Avoid_: channel, delivery surface
+
 **Category**:
 A code-defined enum value classifying what happened (`deny_write`,
 `agent_self`, …). The unit of notification policy.
@@ -38,8 +43,9 @@ Per-tuple duration during which repeats are suppressed (logged, not paged).
 _Avoid_: cooldown, debounce
 
 **Cold trail**:
-The persistent append-only NDJSON event ledger; every event lands there,
-paged or not.
+The persistent append-only NDJSON event ledger; every successfully
+processed event lands there, paged or not — a failing call leaves the
+degraded flag as its trace instead.
 _Avoid_: event log, history
 
 **Hot state**:

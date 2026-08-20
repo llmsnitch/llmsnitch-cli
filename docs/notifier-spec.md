@@ -40,6 +40,38 @@ wrapper scripts `/usr/local/bin/{fs-coil,session-shed,agent-flick}`.
 Migration ticket T003 vendors that tree into this repo (user decision,
 2026-08-19). Until T003 lands, treat `/usr/local` as read-only reference.
 
+### Declared deviations from the map
+
+Where this spec knowingly diverges from a map decision's literal text, the
+divergence and its reason are registered here — nowhere else:
+
+- **D08** `events.ndjson` → daily `events-YYYY-MM-DD.ndjson` files. D11's
+  "daily rotation matching fs-coil's existing pattern" *is* date-stamped
+  files; a single growing file would need a real rotator.
+- **D11** "rotation via LaunchAgent" → no rotation agent exists. The
+  per-event date-stamped filename rotates implicitly; retention stays with
+  `fs-coil prune --target notify`, which D11 itself specifies.
+- **D14** "first-match wins: path, exe, signing" → process signals
+  (signing, then exe) always outrank path, and path is consulted only when
+  no process signals exist. Under the literal order, any binary writing
+  into `~/.claude` in deep mode would attribute to Claude and D07's
+  actor-mismatch could never fire.
+- **D17** registry schema gains an optional `cache_paths[]` — D06's
+  `agent_plugin_cache` category is unclassifiable without it.
+- **D20** "`[agents]` section" → an `[agent.<name>]` section family. INI
+  has no nested structure; one section per agent is the closest faithful
+  encoding.
+- **D23** "deny-list rules tagged `severity=critical`" → tagging is by
+  deny-pattern string, via `CRITICAL_DENY_PATTERNS` in code plus
+  `[notify] critical_patterns` in config (see severity derivation).
+- **Additions with no map decision behind them** (from review, not
+  grilling): severity is derived rather than caller-passed; startup
+  "armed" banners are deleted (AGENTS.md exempts nothing); recovery
+  transitions are ledger-only (`record_only`) because a recovery names no
+  decision; T005 — not the final ticket — deletes the stopgap's watcher
+  helpers, because they die atomically with their call sites (T007's grep
+  re-verifies the stopgap is fully gone).
+
 ## Scope
 
 In scope — all llmsnitch alert surfaces (D02):
@@ -76,8 +108,9 @@ words exactly; the code, config, ledger, and docs all share them.
 - **Novelty window** — per-tuple duration during which repeats of the same
   tuple are suppressed (logged, not paged). Defaults live in the category
   enum; config can override per category and per tuple (D06, D13).
-- **Cold trail** — the persistent NDJSON event ledger. Every event lands
-  here, paged or not (D08).
+- **Cold trail** — the persistent NDJSON event ledger. Every event the
+  notify layer successfully processes lands here, paged or not; a failing
+  call leaves the degraded flag as its trace instead (D08, D21).
 - **Hot state** — the small JSON novelty index consulted on the hot path
   (D12). Different rhythm from the ledger, so a different file.
 - **Degraded flag** — persistent marker set when the notify layer itself
@@ -91,6 +124,10 @@ words exactly; the code, config, ledger, and docs all share them.
   agent's directory; a metadata flag on `deny_write`, not a category (D07).
 - **Agent registry** — the table of known agents and their identifying
   signals: paths, exe basenames, signing ids (D17).
+- **Outlet** — a consumption path a decided notification reaches the user
+  through: Notification Center, `fs-coil noise`, the daily digest, the TUI
+  badge (D18 calls these "delivery surfaces"; renamed because *Surface* is
+  reserved for producers).
 
 ## Architecture
 
@@ -115,18 +152,28 @@ def notify(surface, category, subject, *,
            deny_pattern=None,     # matched deny rule — REQUIRED for deny_*,
                                   # agent_* and keychain_access events
            actor_mismatch=None,   # from classify_event(); target agent (D07)
+           record_only=False,     # ledger row only, no outlet delivery — for
+                                  # events that carry no decision (recovery)
            title=None, message=None,   # NC rendering; built from fields if None
            icon_actor=None, exe_path=None, rexe_path=None,  # icon passthrough
            ) -> bool:
     """Single entry point for every alert surface. Returns True iff a
     Notification Center banner was actually posted (a DELIVERY verdict —
-    with channel_nc or enabled off it is always False even for events that
+    with outlet_nc or enabled off it is always False even for events that
     pass every gate). NEVER raises (D21)."""
 ```
 
 There is no `severity` parameter — severity is **derived, never passed**:
-`"critical"` if `actor_mismatch` is set, else the category's default from
-the enum table. One computation, one place, no precedence question.
+`"critical"` if `actor_mismatch` is set OR `deny_pattern` is a tagged
+critical rule, else the category's default from the enum table. One
+computation, one place, no precedence question. Critical-rule tagging
+implements D23's "deny-list rules tagged `severity=critical`": a
+`CRITICAL_DENY_PATTERNS` frozenset in `fs_coil/deny_rules.py` (ships empty
+— tagging a rule critical pierces cold start, so defaults must be
+conservative) unioned with `[notify] critical_patterns` config globs, both
+matched by exact string equality against the `deny_pattern` value. This is
+how a user makes a specific watched path page even during the learning
+window.
 
 **Event sources**: `notify()` is only ever called for events that already
 cleared a surface-level trigger — a deny-list match (`match_deny`) in the
@@ -145,11 +192,11 @@ chain:
 |---|---|---|---|
 | 1 | `attribute_actor` | `pinfo` / `ppid` / path | `actor_bucket`, `actor_raw` |
 | 2 | `classify_event` (watcher events; wrappers pass `threshold_breach` directly, deep-mode keychain/self-read callers pass their category directly) | path, mode, `actor_bucket` | `category`, `actor_mismatch` |
-| 3 | severity derivation | `category`, `actor_mismatch` | `severity` |
+| 3 | severity derivation | `category`, `actor_mismatch`, `deny_pattern` vs critical-rule tags | `severity` |
 | 4 | novelty gate — under the hot-state lock, resolve the tuple: `first_seen` (never seen → page), `window_expired` (last page older than window → page), `window_repeat` (inside window → suppress, count++), `edge` (`threshold_breach` only — its window is 0, so every call pages; the "certification" that this is a real transition is structural: `edge_alert` only invokes its callbacks on transitions, so no parameter is needed) | tuple, hot state, now | preliminary `novelty_reason`, `notified` |
 | 5 | cold-start override — if `now < install_ts + cold_start` and severity ≠ `critical`: force `notified=false`, `novelty_reason=cold_start_suppressed`. **Precedence: cold start beats `edge`** — a first-day cost breach lands in ledger + digest, not NC (D23 is categorical; only `critical` pierces it). `last_notified_ts` is NOT updated for a cold-start-suppressed event | step-4 result, `install_ts` | final `novelty_reason`, `notified` |
-| 6 | ledger append — exactly one row per `notify()` call, carrying the final outcomes from steps 1–5. "The cold trail is complete" means every *call* yields a row whether or not it pages — not that the row precedes the gate; it can't, it records the gate's outputs | all fields | one NDJSON row |
-| 7 | deliver — iff `notified` and `[notify] enabled` and `channel_nc` and the surface's section is enabled: post via the existing `Notifier` NC mechanics (terminal-notifier, unique `-group` per banner, `launchctl asuser` when euid is 0). The `Notifier._should_emit` 60s cooldown is deleted (D24) — the novelty gate replaces it | row, config | banner or nothing; the return value |
+| 6 | ledger append — exactly one row per non-failing `notify()` call, carrying the final outcomes from steps 1–5 (the fail-closed path below is the sole exception, and it leaves the degraded flag as its trace). The row cannot precede the gate — it records the gate's outputs | all fields | one NDJSON row |
+| 7 | deliver — iff `notified` and not `record_only` and `[notify] enabled` and `outlet_nc` and the surface's section is enabled: post via the existing `Notifier` NC mechanics (terminal-notifier, unique `-group` per banner, `launchctl asuser` when euid is 0). The `Notifier._should_emit` 60s cooldown is deleted (D24) — the novelty gate replaces it | row, config | banner or nothing; the return value |
 
 The **degraded flag never suppresses** — while set, every `notify()` call
 still attempts the full chain (that is exactly how the flag clears on the
@@ -169,9 +216,11 @@ call, or expires after `degraded_flag_ttl` (default 24h). Broken notifier is
 discoverable via `fs-coil status` and the dashboard badge, never assumed
 from silence.
 
-Startup "armed" banners (`fs-coil armed`, `fs-coil (light) armed`) stay as
-direct `Notifier` calls — they are liveness proofs the user opted into by
-starting the daemon, not events, and must not be novelty-suppressed.
+Startup "armed" banners (`fs-coil armed`, `fs-coil (light) armed`) are
+**deleted in T005** — `AGENTS.md` exempts nothing from the actionability
+test, and an armed banner names no decision. Liveness is a pull concern:
+the startup log line remains, and `fs-coil status` / the dashboard show
+daemon state.
 
 ### Category enum (D06, D07)
 
@@ -322,7 +371,8 @@ per hour, not one per write).
 - **Retention** (D11): `fs-coil prune --target notify [--days N]` deletes
   ledger and digest files older than N days (default 30), same date-stamp
   parsing as the existing log prune. `fs-coil prune` without `--target`
-  keeps its current meaning (fs-coil logs) — add `--target all` for both.
+  keeps its current meaning (fs-coil logs); `--target logs` names that
+  explicitly. No other targets.
 
 **Row schema** (D09) — fixed key order, epoch-seconds floats
 (`time.time()`), optional keys omitted when empty:
@@ -356,7 +406,9 @@ the rest of llmsnitch).
 
 - **Location**: `~/Library/Caches/llm-snitch/notify-state.json` (create the
   directory `0700` on first use; nothing else lives there yet).
-- **Schema** (versioned; unknown `version` → move the file aside to
+  `notify-state.json`, its `.tmp` and `.bak` siblings, and
+  `notify-state.lock` are all `0600` (README's flat-file policy).
+- **Schema** (versioned; unknown `version` → move the hot state aside to
   `notify-state.json.bak` and start fresh — a novelty reset is fail-safe
   because the ledger is untouched):
 
@@ -382,17 +434,23 @@ the rest of llmsnitch).
   config-key separator unambiguous. `degraded` is `null` or a short reason
   string; `degraded_ts` is its timestamp sibling for TTL expiry.
 - **Locking + crash safety** (D12): all access serializes on a dedicated
-  lock file `notify-state.lock` beside the state file
-  (`fcntl.flock(LOCK_EX)` on the lock fd — never on the state file itself,
-  because atomic replace changes the state file's inode). Read-modify-write
-  under the lock: read state, mutate, write to `notify-state.json.tmp`,
-  `os.replace()` over the real file. A crash mid-write can only lose the
-  tmp file, never the state. The file stays small (≤ a few hundred tuples),
-  so whole-file rewrite under one lock is the right rhythm.
-- Corrupt JSON / unknown version → move the file aside to `.bak` and
+  lock file `notify-state.lock` beside the hot state
+  (`fcntl.flock` on the lock fd — never on `notify-state.json` itself,
+  because atomic replace changes its inode). Acquire with `LOCK_EX |
+  LOCK_NB` plus short bounded retries (5 × 20 ms); if still contended,
+  give up into the fail-closed path — the notify chain may run inside
+  watcher loops, so it must never hang on a lock. (README's "hot path
+  never blocks" is written about the llmsnitch hook handler; this bounded
+  discipline keeps the notify chain in the same spirit.) Read-modify-write
+  under the lock: read the hot state, mutate, write to
+  `notify-state.json.tmp`, `os.replace()` over the real file. A crash
+  mid-write can only lose the tmp file, never the hot state. It stays
+  small (≤ a few hundred tuples), so whole-file rewrite under one lock is
+  the right rhythm.
+- Corrupt JSON / unknown version → move the hot state aside to `.bak` and
   rebuild — but **recover `install_ts` from the earliest
   `events-YYYY-MM-DD.ndjson` filename date** (the cold trail knows when
-  this install started), so a state-file reset can never silently re-arm
+  this install started), so a hot-state reset can never silently re-arm
   the 24h cold-start suppression. Also set the degraded flag with reason
   `state_reset` so the rebuild is visible in `fs-coil status`. If no ledger
   files exist either, this genuinely is a fresh install: stamp `now`.
@@ -402,7 +460,7 @@ the rest of llmsnitch).
   produce exactly one `install_ts` (and the ownership rule above makes the
   root-created file user-owned).
 - Test seams: `LLMSNITCH_NOTIFY_DIR` overrides the ledger/digest directory
-  and `LLMSNITCH_STATE_FILE` overrides the hot-state path — unit tests
+  and `LLMSNITCH_HOT_STATE` overrides the hot-state path — unit tests
   point both at tmp dirs; production never sets them.
 
 ### Window resolution order (D13, D20)
@@ -439,7 +497,7 @@ Only these three section names are consulted; anything else under
 `[notify.*]` is ignored (so a stray `[notify.fs-coil-light]` has no
 effect). `enabled = false` in a surface section stops that surface's
 *paging* only — its events still ledger; `[notify] enabled = false` does
-the same for all surfaces. Both compose as AND with `channel_nc` (decision
+the same for all surfaces. Both compose as AND with `outlet_nc` (decision
 chain step 7).
 
 Full worked example:
@@ -448,11 +506,13 @@ Full worked example:
 [notify]
 # Global cross-cutting knobs.
 enabled = true                 # master switch; false = ledger-only, no pages
-channel_nc = true              # Notification Center banners
-channel_digest = true          # daily digest file + threshold-gated banner
+outlet_nc = true               # Notification Center banners
+outlet_digest = true           # daily digest file + threshold-gated banner
 digest_banner_threshold = 20   # NC banner when any category's day-count >= this
 degraded_flag_ttl = 24h        # degraded flag auto-expires after this
 cold_start = 24h               # learning window after install (D23)
+# critical_patterns = ~/.ssh/**   # deny rules tagged critical (D23): exact
+                                  # deny-pattern strings; pierce cold start
 # Category window overrides (see resolution order in the spec):
 window_deny_write = 1h
 window_agent_self = 24h
@@ -487,10 +547,12 @@ section for an unknown name registers a brand-new agent (D17).
 The T001 stopgap key `suppress_claude_self` is deleted in migration T007 —
 the `agent_self` category subsumes it.
 
-## Delivery surfaces
+## Delivery outlets
 
-Four (D18). Every rendered line obeys the actionability doctrine: name the
-decision, name the actor, respect novelty.
+Four (D18 — the map calls them "delivery surfaces"; *outlet* is the
+glossary term, since Surface is reserved for producers). Every rendered
+line obeys the actionability doctrine: name the decision, name the actor,
+respect novelty.
 
 ### 1. Notification Center (immediate)
 
@@ -562,9 +624,11 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 
 - New `fs_coil/render_notify.py` pane, following the existing `render_*.py`
   module pattern and the dashboard's 5s refresh.
-- Shows: today's per-category counts (critical red / high yellow /
-  suppressed dim), a mini-log tail of the last 5 ledger rows, and — if the
-  degraded flag is set — a red `⚠ notifier degraded: <reason>` line (D22).
+- Shows: today's per-category counts, a mini-log tail of the last 5 ledger
+  rows, and — if the degraded flag is set — a `⚠ notifier degraded:
+  <reason>` line (D22). Colors reuse `fs_coil/theme.py` — critical → the
+  theme's error style (`err`), high → `_YELLOW`, suppressed/low → `_DIM`,
+  headers → `_C7`. No new colors.
 - `fs-coil status` additionally prints the degraded flag as a key-value row
   (good=false styling) so the flag is visible without the dashboard.
 
@@ -606,6 +670,7 @@ wrappers need no restart (invoked per-run).
   package is not imported by the llmsnitch package, so nothing breaks — if
   the no-network-imports grep unexpectedly sweeps the vendored tree, STOP
   and report rather than editing vendored code).
+- **Delete**: nothing.
 - **Test strategy**: the diff/find/test commands above are the test.
 
 ### T004 — Core notify engine (library only, no callers)
@@ -615,21 +680,25 @@ wrappers need no restart (invoked per-run).
   degraded flag, `notify()` pipeline), `fs_coil/agent_registry.py`
   (built-in table, `[agent.*]` merge, `attribute_actor`),
   `tests/test_notify.py`.
-- **Touch**: nothing existing.
+- **Touch**: `fs_coil/deny_rules.py` only to add the (empty)
+  `CRITICAL_DENY_PATTERNS` frozenset; nothing else existing.
+- **Delete**: nothing.
 - **Done criteria**: all new tests pass; no existing test breaks; a REPL
   smoke call `notify("fs-coil-light", "deny_write", "~/.ssh/config",
   deny_pattern="~/.ssh/**")` under `LLMSNITCH_NOTIFY_DIR`/
-  `LLMSNITCH_STATE_FILE` overrides **with `cold_start = 0` in config** (or
-  a backdated `install_ts` in the fresh state file — without one of these
+  `LLMSNITCH_HOT_STATE` overrides **with `cold_start = 0` in config** (or
+  a backdated `install_ts` in the fresh hot state — without one of these
   the learning window correctly forces False) writes a ledger row and
-  returns True first call / False second call, default channels on.
+  returns True first call / False second call, default outlets on.
 - **Test strategy**: unit tests against tmp dirs with env-var overrides for
-  ledger dir and state file, and an injectable clock (`notify(..., _now=)`
+  ledger dir and hot state, and an injectable clock (`notify(..., _now=)`
   or module-level `_now()` monkeypatched). Cover: first_seen pages,
   window_repeat suppresses, window_expired re-pages, edge (threshold_breach)
   pages every call, cold-start suppresses high (including threshold_breach —
-  step-5 precedence) but not critical, degraded flag set on forced ledger
-  IOError and notify() returns False without raising, state-file version
+  step-5 precedence) but not critical, a `critical_patterns`-tagged deny
+  pattern pierces cold start (D23), `record_only=True` writes the row with
+  `notified=false` and never banners, degraded flag set on forced ledger
+  IOError and notify() returns False without raising, hot-state version
   mismatch / corrupt JSON moves aside + recovers `install_ts` from the
   earliest ledger filename + sets `degraded=state_reset`, concurrent append
   rows stay intact (two processes, 500 rows each, all parse), invalid agent
@@ -646,6 +715,13 @@ wrappers need no restart (invoked per-run).
   `notify.py`/registry per D25),
   `fs_coil/notifier.py` (**delete** `_should_emit`, `_last`, `_cooldown`;
   `Notifier` keeps icon + delivery mechanics only).
+- **Create**: nothing — new tests extend `tests/test_notify.py`.
+- **Delete** (summary of the deletions embedded above, plus one more):
+  `load_notify_suppress`, `match_suppress`, `_low_noise`,
+  `Notifier._should_emit`/`_last`/`_cooldown`, and both startup "armed"
+  banner `Notifier` calls in `monitor.py` and `light_watcher.py` (the
+  startup *log lines* stay — liveness is pull, per the doctrine note in
+  Architecture).
 - **Done criteria** (run with `cold_start = 0` in
   `~/.config/llm-snitch/config`, or a backdated `install_ts` — a fresh
   install's learning window otherwise suppresses the banners below):
@@ -655,8 +731,10 @@ wrappers need no restart (invoked per-run).
   ~/.ssh/spec-test && trash ~/.ssh/spec-test` produces `deny_write`. Then
   under the LaunchAgent (`light-agent`, `stdout_only=False` — "stdout_only"
   is the existing flag on `run_light_monitor`/`run_monitor`, exposed as the
-  `light` vs `light-agent` subcommands): the first `deny_write` posts one
-  banner, a second touch within 1h produces `window_repeat` and no banner.
+  `light` vs `light-agent` subcommands): agent startup posts NO banner (the
+  armed banner is deleted; the startup log line still appears), the first
+  `deny_write` posts one banner, a second touch within 1h produces
+  `window_repeat` and no banner.
   Predicate-equivalence tests for `_low_noise` → `agent_signed_self_read`
   pass (same inputs, same suppress verdicts — signing-id match,
   bundle-layout fallback, and the attacker-named `/tmp/claude.app/` case
@@ -670,27 +748,36 @@ wrappers need no restart (invoked per-run).
   local `_on_breach` / `_on_recover` callbacks and pass them to
   `bridge.edge_alert(state_path, verdict, _on_breach, _on_recover)` (see
   the vendored `bin/session-shed` near its `edge_alert` call). Change ONLY
-  the callback bodies: `Notifier().notify(...)` becomes
-  `notify("<session-shed|agent-flick>", "threshold_breach", <verdict
-  summary>)`. `fs_coil/bridge.py` is untouched — `edge_alert` remains the
-  transition detector, and that is what makes `threshold_breach` calls
-  edge-certified: the callbacks only ever run on a real transition, so
-  `notify()` needs no transition parameter and its 0-window pages every
-  call it receives.
+  the callback bodies: in `_on_breach`, `Notifier().notify(...)` becomes
+  `notify("<session-shed|agent-flick>", "threshold_breach", <subject>,
+  actor_bucket="claude-code")` — the wrappers audit Claude Code sessions,
+  so the monitored agent is the actor (AGENTS.md Actor gate), and
+  `<subject>` names the breaching session id when the wrapped tool exposes
+  one (e.g. `"session 8f3a: cost 6.10 > ceiling 5.00"`), else the verdict
+  summary alone. In `_on_recover`, the same call with `record_only=True` —
+  a recovery names no decision (AGENTS.md gate 1), so it is ledgered for
+  the digest, never bannered. `fs_coil/bridge.py` is untouched —
+  `edge_alert` remains the transition detector, and that is what makes
+  `threshold_breach` calls edge-certified: the callbacks only ever run on a
+  real transition, so `notify()` needs no transition parameter and its
+  0-window pages every call it receives.
+- **Create**: nothing.
+- **Delete**: nothing.
 - **Done criteria** (cold start disabled or expired, as in T005): with a
   hand-edited `state.json` verdict, a simulated pass→breach run posts
   exactly one banner and one ledger row with `novelty_reason=edge`;
   repeating the same breach verdict posts nothing (edge_alert never invokes
-  the callback — verify the ledger gained no row either); breach→pass posts
-  the recovery once; first-ever healthy run stays silent (existing bridge
-  guarantee preserved).
+  the callback — verify the ledger gained no row either); breach→pass
+  writes exactly one recovery ledger row (`notified=false`) and NO banner;
+  first-ever healthy run stays silent (existing bridge guarantee
+  preserved).
 - **Test strategy**: unit-test the callbacks with a stubbed notify;
   end-to-end via `session-shed check` against a fixture state dir.
 
-### T007 — Delivery surfaces + stopgap cleanup + docs
+### T007 — Delivery outlets + stopgap cleanup + docs
 
 - **Touch**: `fs_coil/commands.py` (`cmd_noise` reimplemented over the
-  ledger; new `cmd_digest`; `cmd_prune` gains `--target notify|logs|all`;
+  ledger; new `cmd_digest`; `cmd_prune` gains `--target notify|logs`;
   `cmd_status` prints the degraded flag), `fs_coil/cli.py` (dispatch +
   USAGE for `digest`, `noise` flags, `prune --target`),
   `fs_coil/dashboard.py` (mount the new pane).
@@ -708,8 +795,8 @@ wrappers need no restart (invoked per-run).
   this spec.
 - **Done criteria**: `fs-coil noise` groups ledger rows; `fs-coil digest`
   writes the digest file and honors the banner threshold both ways;
-  `fs-coil status` shows `degraded` when the flag is hand-set in the state
-  file; dashboard renders the pane; `grep -rn "suppress_claude_self\|load_notify_suppress\|match_suppress\|_low_noise\|_should_emit" fs_coil bin`
+  `fs-coil status` shows `degraded` when the flag is hand-set in the hot
+  state; dashboard renders the pane; `grep -rn "suppress_claude_self\|load_notify_suppress\|match_suppress\|_low_noise\|_should_emit" fs_coil bin`
   returns nothing; `grep suppress_claude_self ~/.config/llm-snitch/config`
   returns nothing (the live-config half of the deletion — the repo grep
   cannot see it); full test suite green.
@@ -749,7 +836,7 @@ in T004 even though this section is deferred.)
 
 **Non-goals**: no ML, no seasonality/weekday modeling, no per-path
 granularity (tuples only), no real-time anomaly pages (digest only), no new
-state files. If 2σ proves too twitchy, the knob is a single
+on-disk state. If 2σ proves too twitchy, the knob is a single
 `digest_anomaly_sigma` config value — not a new algorithm.
 
 ## Out of scope
