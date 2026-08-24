@@ -29,6 +29,18 @@ required surface:
 
 HITL: grill + domain-model with the user; new terms land in `CONTEXT.md`.
 
+## Inputs from T101
+
+- **zstd collision**: DeepSeek Harness defaults to zstd-compressed session
+  logs (`.jsonl.zstd`); Python 3.9 stdlib has no zstd decoder
+  (`compression.zstd` arrives in 3.14). The contract must say what happens
+  when a harness's traces exist locally but aren't stdlib-readable — a tier,
+  an exclusion, or a documented wait-for-3.14.
+- **Pilot context**: Codex CLI has both plain JSONL sessions
+  (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` + `session_index.jsonl`)
+  and a `~/.codex/hooks.json` — a live specimen for the hook-vs-transcript
+  tier decision.
+
 ## Resolution
 
 *(append decision summary here, close, and index on the map)*

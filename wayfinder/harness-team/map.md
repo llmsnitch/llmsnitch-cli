@@ -104,6 +104,16 @@ tickets append below as they resolve)*
 - **D12** Dashboards-per-harness = in-scope fog (R2 Q11=a).
 - **D13** Browser extension = out of scope (R2 Q12).
 
+### Closed tickets
+- [T101 — Union roster + popularity ranking](tickets/T101-roster-ranking.md)
+  — union = 12 (Ori's "claude" ≡ cookbook's "Claude Code"). Order: Codex CLI,
+  Cursor, OpenClaw, OpenCode, Hermes, DeepSeek Harness, Pi, Grok Build,
+  Claude Desktop, Prime Agent, Junie. **Pilot = Codex CLI** (top installs,
+  only unsupported harness on this machine, plain JSONL sessions +
+  `~/.codex/hooks.json`). 7 admission PASS, 3 needs-probe (Cursor, Grok
+  Build, Junie), Claude Desktop split (see Out of scope). Feeds T102: zstd
+  tier question; feeds T104: Pi/Prime Agent one-adapter collapse.
+
 ## Not yet specified
 
 - **Per-harness dashboard parity** — extending the already-decided reporting
@@ -133,3 +143,6 @@ tickets append below as they resolve)*
   the local clone instead (D09).
 - **Cloud-only harnesses** failing the admission test — recorded per-harness
   in the roster ticket's resolution as they're identified (D04).
+- **Claude Desktop's chat surface** — cloud-only (per T101, split verdict);
+  its embedded Code tab writes locally but is already covered by the Claude
+  Code adapter.

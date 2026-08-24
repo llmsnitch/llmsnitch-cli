@@ -22,6 +22,13 @@ definitions, single responsibility, declared inputs/outputs) and
 no plugin install (map D09). Prompts reference the T102 contract and T103
 dossier format by path. Consult `mattpocock-skills:writing-for-agents`.
 
+## Inputs from T101
+
+- Pi and Prime Agent are near-identical codebases (Prime is Pi-derived;
+  byte-identical session docs modulo naming). The pipeline should support
+  "derived harness" runs where one adapter covers two roster entries — do Pi
+  first and Prime Agent nearly falls out.
+
 ## Resolution
 
 *(append the settled design — layout, roles, gates, state — then close;
