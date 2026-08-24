@@ -82,3 +82,30 @@ _Avoid_: agent list, whitelist
 The three tests from `AGENTS.md` every page must pass: Decision, Actor,
 Novelty.
 _Avoid_: notification rules
+
+**Harness**:
+An AI coding agent product whose activity llmsnitch traces (Claude Code,
+Codex CLI, Cursor, …). The thing an adapter supports.
+_Avoid_: agent (ambiguous with registry actors), tool
+
+**Harness adapter**:
+The per-harness module giving llmsnitch parity support — ingestion, cost,
+health, installer — coupled with that harness's agent-registry entry.
+_Avoid_: plugin, integration, connector
+
+**Dossier**:
+The single per-harness fact sheet (trace locations, config paths, hook
+system, pricing source, exes/signing ids, admission verdict) that feeds the
+adapter, the registry entry, and later the scan seed table.
+_Avoid_: profile, spec, survey
+
+**Roster**:
+The ordered list of harnesses queued for support: union of Ori's and the
+OpenRouter cookbook's lists, popularity-ranked, admission-tested.
+_Avoid_: backlog, matrix
+
+**Admission test**:
+The roster gate: a harness is adapter-eligible iff it writes local
+trace/session files on disk; cloud-only harnesses fall to the companion
+browser extension.
+_Avoid_: eligibility check, filter

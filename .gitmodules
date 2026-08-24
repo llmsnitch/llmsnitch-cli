@@ -1,0 +1,36 @@
+[submodule "submodules/OpenRouterTeam/docs"]
+	path = submodules/OpenRouterTeam/docs
+	url = https://github.com/OpenRouterTeam/docs
+[submodule "submodules/OpenRouterTeam/go-sdk"]
+	path = submodules/OpenRouterTeam/go-sdk
+	url = https://github.com/OpenRouterTeam/go-sdk
+[submodule "submodules/OpenRouterTeam/python-sdk"]
+	path = submodules/OpenRouterTeam/python-sdk
+	url = https://github.com/OpenRouterTeam/python-sdk
+[submodule "submodules/OpenRouterTeam/typescript-sdk"]
+	path = submodules/OpenRouterTeam/typescript-sdk
+	url = https://github.com/OpenRouterTeam/typescript-sdk
+[submodule "submodules/OpenRouterTeam/skills"]
+	path = submodules/OpenRouterTeam/skills
+	url = https://github.com/OpenRouterTeam/skills
+[submodule "submodules/OpenRouterTeam/.github"]
+	path = submodules/OpenRouterTeam/.github
+	url = https://github.com/OpenRouterTeam/.github
+[submodule "submodules/OpenRouterTeam/typescript-agent"]
+	path = submodules/OpenRouterTeam/typescript-agent
+	url = https://github.com/OpenRouterTeam/typescript-agent
+[submodule "submodules/OpenRouterTeam/go-agent"]
+	path = submodules/OpenRouterTeam/go-agent
+	url = https://github.com/OpenRouterTeam/go-agent
+[submodule "submodules/OpenRouterTeam/awesome-openrouter"]
+	path = submodules/OpenRouterTeam/awesome-openrouter
+	url = https://github.com/OpenRouterTeam/awesome-openrouter
+[submodule "submodules/OpenRouterTeam/python-agent"]
+	path = submodules/OpenRouterTeam/python-agent
+	url = https://github.com/OpenRouterTeam/python-agent
+[submodule "submodules/OpenRouterTeam/ai-sdk-provider"]
+	path = submodules/OpenRouterTeam/ai-sdk-provider
+	url = https://github.com/OpenRouterTeam/ai-sdk-provider
+[submodule "submodules/OpenRouterTeam/SnitchScript"]
+	path = submodules/OpenRouterTeam/SnitchScript
+	url = https://github.com/OpenRouterTeam/SnitchScript
