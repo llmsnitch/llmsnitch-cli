@@ -44,9 +44,12 @@ with the team, not on this map.
 - **Primary sources, all local**:
   - `submodules/OpenRouterTeam/docs` — `guides/ori/harness.mdx` (Ori's 8),
     `cookbook/coding-agents/*.mdx` (cookbook's 8, config-path hints).
-  - snyk-agent-scan (vendored under the security-scanners submodules) —
-    36-row per-OS `CandidateClient` well-known-path table + 9 per-agent
-    discoverers (`well_known_clients.py`, `agents/`).
+  - snyk-agent-scan — `submodules/security-scanners/snyk-agent-scan`
+    (pinned a59b55a; Apache-2.0): 36-row per-OS `CandidateClient`
+    well-known-path table + 9 per-agent discoverers
+    (`src/agent_scan/well_known_clients.py`, `src/agent_scan/agents/`).
+    The other 14 security scanners remain untracked in the main checkout —
+    they belong to the scan-MVP effort, not this map.
   - `~/Repos/agent-sh` — AgentSys patterns to borrow: `next-task/agents/*.md`
     file-based agent definitions, `audit-project/commands/` spawn logic.
   - `docs/notifier-spec.md` §Agent registry; `docs/research/scanner-survey-mvp.md`.

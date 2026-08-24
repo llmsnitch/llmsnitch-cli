@@ -34,3 +34,6 @@
 [submodule "submodules/OpenRouterTeam/SnitchScript"]
 	path = submodules/OpenRouterTeam/SnitchScript
 	url = https://github.com/OpenRouterTeam/SnitchScript
+[submodule "submodules/security-scanners/snyk-agent-scan"]
+	path = submodules/security-scanners/snyk-agent-scan
+	url = https://github.com/snyk/agent-scan
