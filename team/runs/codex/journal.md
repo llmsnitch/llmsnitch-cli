@@ -114,3 +114,30 @@ test_codex_hostile_native_id_cannot_escape_store (traversal repro now
 caught); N2 model ids through _clean capped 200; N3 dossier §3 corrected.
 Local run: 22/22 passed.
 verdict: PASS
+
+## Phase 5 — Doctrine re-audit (attempt 2, of 23898e7)
+started: 2026-08-25 01:29 EDT   finished: 2026-08-25 01:35 EDT
+evidence: auditor re-report. 9/9 checklist items ticked. F1-F3 and N1-N3
+closed; every new test proven to DISCRIMINATE (auditor reproduced each
+pre-fix behaviour underneath it: traversal test failed, partial-check test
+failed, ledger-touch test failed — then all pass on real code). Post-fix
+regression sweep: oracle 84/84, distribution {0:4,1:79,2:1}, 0 ~/.codex
+writes, 169 store files 0600/0700. Registry ids confirmed observed-not-
+guessed (both dossier-dated). Doctrine + purpose PASS.
+Residual (non-blocking, follow-up pile): §1-vs-§8 cache_paths gap for
+sqlite sidecars (fixed in the phase-6 commit); signing-id prefix-vs-exact
+shape divergence vs notifier-spec placeholder — notifier effort's call;
+provider_families inert until C7 pricing table; list ID collisions; >64ch
+native-id fallback unreachable today.
+verdict: PASS
+
+## Phase 6 — Close
+started: 2026-08-25 01:36 EDT
+evidence: cache_paths sidecar gap reconciled (§8 + harness.py); roster row
+codex → done (tier: ledger). Commits this run: b224e86 (dossier), 9ec3850
+(adapter), f2de841 (verify fix), 291d709 (verify journal), 23898e7 (audit
+fixes), + this closing commit. Signal-set proof: 84/84 real sessions
+ingested, total_tokens oracle-exact against state_5.sqlite on all 84.
+verdict: PASS — run complete; codex is "supported" per map D02 (ledger
+tier). Note: the user's live ~/.llmsnitch has NOT been populated —
+deployment is one `llmsnitch ingest` (or any list/show/check) away.

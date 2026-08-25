@@ -1,6 +1,10 @@
 # Harness Team — Wayfinder Map
 
 `label: wayfinder:map`
+`status: CLOSED (2026-08-25) — destination reached: the team exists under
+team/ and proved itself on the codex pilot (T106). Remaining roster
+harnesses are team runs, not map work; residual fog below is inherited by
+future efforts.`
 
 ## Destination
 
@@ -144,6 +148,12 @@ tickets append below as they resolve)*
 - [T105 — Author the team](tickets/T105-author-team.md) — `team/` authored:
   README playbook, 12-harness roster, four role files. Baseline 16/16
   tests green. A fresh session starts a run from `team/README.md` unaided.
+- [T106 — Pilot run](tickets/T106-pilot-run.md) — **destination reached**:
+  codex supported at ledger tier, verified against all 84 real sessions
+  (token totals oracle-exact 84/84), 22/22 tests. The phase gates caught
+  and fixed a +73% token overcount, an untranscribed registry half, a
+  silent partial-health gate, and a reproduced path traversal — the team
+  works. Follow-up pile lives in the run journal's Phase 5 entry.
 
 ## Not yet specified
 

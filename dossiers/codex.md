@@ -251,6 +251,8 @@ refused, and nothing was lost — only the path is needed.)
             "~/.codex/log",
             "~/.codex/shell_snapshots",
             "~/.codex/thread-writer-locks",
+            "~/.codex/*.sqlite-wal",   # §1: churn constantly — the noisiest paths
+            "~/.codex/*.sqlite-shm",
             "~/.codex/models_cache.json",
             "~/.codex/cloud-config-bundle-cache.json",
         ],

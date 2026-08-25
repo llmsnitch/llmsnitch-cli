@@ -162,6 +162,7 @@ HARNESSES = {
             "cache_paths": ["~/.codex/cache", "~/.codex/.tmp", "~/.codex/tmp",
                             "~/.codex/log", "~/.codex/shell_snapshots",
                             "~/.codex/thread-writer-locks",
+                            "~/.codex/*.sqlite-wal", "~/.codex/*.sqlite-shm",
                             "~/.codex/models_cache.json",
                             "~/.codex/cloud-config-bundle-cache.json"],
         },
