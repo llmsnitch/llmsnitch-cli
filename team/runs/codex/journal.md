@@ -60,3 +60,27 @@ prefix+UUIDv7-time ids (17/84 render ambiguously) — follow-up, not C4.
 verdict: FAIL → returned to Phase 3 per README failure handling
 verdict-note: dossier trap 1 wording also corrected (the two readings are
 NOT interchangeable; summing last_token_usage double-counts restated rows)
+
+## Phase 3 (fix) — Adapter
+started: 2026-08-25 01:10 EDT   finished: 2026-08-25 01:14 EDT
+evidence: commit f2de841 — cumulative-delta token attribution (restated
+rows → zero delta), turn_context models registered with zero-token
+entries; fixture hardened (restated rows incl. differing-last variant,
+declared-only azureml model); dossier trap 1 + §8 corrected. Orchestrator
+check: 20/20; oracle 84/84; distribution {0:4, 1:79, 2:1}.
+verdict: PASS
+
+## Phase 4 — Verify (attempt 2, re-gate of f2de841)
+started: 2026-08-25 01:15 EDT   finished: 2026-08-25 01:18 EDT
+evidence: independent verifier re-report. Item 1 PASS: 20/20 pasted.
+Fixture-teeth proof: buggy 9ec3850 harness.py against the NEW fixture
+fails 18/20 — regression locked. Item 2 PASS: sweep 84/84 sessions,
+oracle exact 84/84 (was 69/84), distribution {0:4, 1:79, 2:1} matches
+dossier §3, azureml:// id stored with honest zero spend (session total
+unchanged 22708). Extra: cumulative never decreases in any real session
+(d>0 guard defensive only); usage events sum == meta total on 84/84;
+show/check/list render the new zero-token shape, exit 0.
+Non-blocking follow-ups: fixture's azureml turn_context ordering differs
+from the real (superseded-first) shape; `list` ID column collides at 14
+chars on prefixed UUIDv7 ids (17/84) — shared-renderer cosmetic issue.
+verdict: PASS
