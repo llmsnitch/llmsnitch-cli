@@ -36,3 +36,27 @@ trap, parent session_meta, interrupted-not-error, seeded fake secret,
 body-class rows) + 4 new tests. Local run: 20/20 passed.
 zero writes outside the repo; ~/.codex untouched.
 verdict: PASS
+
+## Phase 4 — Verify (attempt 1)
+started: 2026-08-25 01:07 EDT   finished: 2026-08-25 01:09 EDT
+evidence: independent verifier report (full text preserved in this session's
+transcript; key numbers below). Item 1 PASS: suite 20/20 incl. no-network
+guard. Item 3 PASS: 168 files 0600 / 85 dirs 0700 across all 84 real
+sessions; harness column renders. Item 4 PASS: ~/.codex sessions tree
+untouched (0 files newer than marker; the 4 changed files are dossier-listed
+caches owned by a live codex process); repo tree clean; real ~/.llmsnitch
+never opened (temp LLMSNITCH_DIR).
+Item 2 FAIL — two defects:
+  2a: total_tokens summed last_token_usage; codex RESTATES token_count rows
+      (13 duplicate pairs in worst file; a restated row can carry a
+      DIFFERENT last under an unchanged cumulative). Oracle match only
+      69/84, overstating up to +72.9%. Correct reading: cumulative
+      total_token_usage (oracle-exact 84/84).
+  2b: model declared in turn_context with no token row is dropped —
+      including a live azureml:// id (trap 7's case). Distribution should
+      be {0:4, 1:79, 2:1}, adapter produced {0:5, 1:79}.
+Non-blocking note: `list` ID column (14 chars) collides on
+prefix+UUIDv7-time ids (17/84 render ambiguously) — follow-up, not C4.
+verdict: FAIL → returned to Phase 3 per README failure handling
+verdict-note: dossier trap 1 wording also corrected (the two readings are
+NOT interchangeable; summing last_token_usage double-counts restated rows)

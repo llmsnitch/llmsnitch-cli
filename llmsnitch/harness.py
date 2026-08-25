@@ -12,10 +12,17 @@ from datetime import datetime, timezone
 
 from .hook import _clean
 
-# Fields summed from codex last_token_usage (dossier §3; trap 1: the
-# total_token_usage counter is cumulative — sum last_token_usage instead).
+# Token fields tracked from codex's CUMULATIVE total_token_usage (dossier
+# trap 1, verifier-corrected: codex restates token_count rows, so summing
+# last_token_usage double-counts — 15/84 real sessions wrong, up to +73%.
+# Cumulative deltas are oracle-exact 84/84 against state_5.sqlite and
+# attribute spend to the model current at each row).
 _CODEX_TOKEN_FIELDS = ("input_tokens", "cached_input_tokens", "output_tokens",
                        "reasoning_output_tokens", "total_tokens")
+
+
+def _zeros():
+    return dict.fromkeys(_CODEX_TOKEN_FIELDS, 0)
 
 
 def _iso_epoch(s):
@@ -46,6 +53,7 @@ def parse_codex(path):
     native_id = cwd = provider = None
     model = None
     models = {}
+    prev = {}                                   # last-seen cumulative per field
     events = []
     errors = 0
     first = last = None
@@ -72,20 +80,33 @@ def parse_codex(path):
                 cwd = p.get("cwd")
                 provider = p.get("model_provider")
             elif t == "turn_context":
-                model = p.get("model") or model
+                if p.get("model"):
+                    model = str(p["model"])
+                    # verifier defect 2b: a declared model must survive even
+                    # with no attributed spend (e.g. a superseded azureml://
+                    # turn — trap 7's detection signal).
+                    models.setdefault(model, _zeros())
                 cwd = cwd or p.get("cwd")
             elif pt == "token_count":
                 info = p.get("info")
-                ltu = info.get("last_token_usage") if isinstance(info, dict) else None
-                if isinstance(ltu, dict):
-                    m = models.setdefault(str(model or "unknown"), dict.fromkeys(_CODEX_TOKEN_FIELDS, 0))
+                tot = info.get("total_token_usage") if isinstance(info, dict) else None
+                if isinstance(tot, dict):
+                    m = models.setdefault(str(model or "unknown"), _zeros())
+                    delta_total = 0
                     for k in _CODEX_TOKEN_FIELDS:
-                        v = ltu.get(k)
-                        if isinstance(v, (int, float)):
-                            m[k] += v
-                    events.append({"ts": ts, "event": "usage",
-                                   "model": str(model or "unknown"),
-                                   "tokens": ltu.get("total_tokens")})
+                        v = tot.get(k)
+                        if not isinstance(v, (int, float)):
+                            continue
+                        d = v - prev.get(k, 0)
+                        prev[k] = v
+                        if d > 0:               # restated row -> zero delta
+                            m[k] += d
+                            if k == "total_tokens":
+                                delta_total = d
+                    if delta_total:
+                        events.append({"ts": ts, "event": "usage",
+                                       "model": str(model or "unknown"),
+                                       "tokens": delta_total})
             elif _codex_error(pt, p):
                 errors += 1
                 events.append({"ts": ts, "event": "harness_error", "kind": str(pt)})

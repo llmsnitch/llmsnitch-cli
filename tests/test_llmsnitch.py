@@ -257,8 +257,14 @@ def test_codex_ledger_signal_set():
         assert meta["cwd"] == "/tmp/proj", "cwd must come from FIRST session_meta"
         tok = meta["tokens_by_model"]["gpt-5.5"]
         assert tok["input_tokens"] == 140 and tok["output_tokens"] == 80
-        assert tok["total_tokens"] == 250, "sum last_token_usage, never totals"
+        assert tok["total_tokens"] == 250, \
+            "restated token_count rows must not double-count (cumulative deltas)"
         assert meta["total_tokens"] == 250
+        azure = "azureml://registries/azure-openai/models/gpt-5.3-codex/versions/2026-02-24"
+        assert azure in meta["tokens_by_model"], \
+            "declared-but-tokenless model must survive (trap 7)"
+        assert meta["tokens_by_model"][azure]["total_tokens"] == 0
+        assert meta["models"] == sorted([azure, "gpt-5.5"])
         assert meta["error_count"] == 2, "mcp+patch errors; interrupted excluded"
         assert meta["started_at"] and meta["ended_at"] > meta["started_at"]
         assert meta["signals_partial"] and meta["cost_usd"] is None
@@ -287,9 +293,9 @@ def test_codex_cursor_idempotent_and_incremental():
         assert ingest.sweep() == 1
         assert ingest.sweep() == 0, "unchanged file must be skipped"
         row = ('{"timestamp":"2026-08-20T10:06:00.000Z","type":"event_msg",'
-               '"payload":{"type":"token_count","info":{"last_token_usage":'
-               '{"input_tokens":10,"cached_input_tokens":0,"output_tokens":40,'
-               '"reasoning_output_tokens":0,"total_tokens":50}}}}\n')
+               '"payload":{"type":"token_count","info":{"total_token_usage":'
+               '{"input_tokens":150,"cached_input_tokens":20,"output_tokens":120,'
+               '"reasoning_output_tokens":10,"total_tokens":300}}}}\n')
         with open(fx, "a") as f:
             f.write(row)
         assert ingest.sweep() == 1

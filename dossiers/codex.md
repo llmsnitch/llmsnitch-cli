@@ -146,13 +146,16 @@ refused, and nothing was lost — only the path is needed.)
 
 ## 7. Quirks & warnings
 
-1. **`total_token_usage` is cumulative — never sum it.** Each `token_count`
-   row restates the session running total. Verified monotonic non-decreasing
-   in all 84 files, and in one 13-row session the final total (307,040)
-   equalled the sum of the per-row `last_token_usage` values exactly.
-   Correct readings: take the **last** `total_token_usage`, or sum
-   `last_token_usage`. Summing `total_token_usage` overcounts by roughly the
-   turn count — an order of magnitude on a long session.
+1. **`total_token_usage` is cumulative, and it is the ONLY correct reading**
+   *(corrected 2026-08-25 by the T106 verifier)*. Each `token_count` row
+   restates the session running total (monotonic in all 84 files). Codex
+   also **restates whole rows**: `last_token_usage` repeats under an
+   unchanged cumulative — sometimes with a *different* `last` value — so
+   summing `last_token_usage` double-counts (wrong on 15/84 real sessions,
+   overstating up to +72.9%). Correct reading: track the cumulative
+   `total_token_usage` (per-model attribution via deltas at each row);
+   oracle-exact 84/84 against `state_5.sqlite`. Never sum
+   `total_token_usage` either — that overcounts by roughly the turn count.
 2. **Filename timestamps are local time; row timestamps are UTC.** E.g.
    `rollout-2026-04-02T14-38-40-…` whose first row is `2026-04-02T18:40:02.919Z`
    — a 4-hour EDT skew, consistent across samples. Derive session start from
@@ -268,9 +271,12 @@ refused, and nothing was lost — only the path is needed.)
 Code hook required (the JSONL shape genuinely diverges from Claude Code's):
 
 - take the **first** `session_meta` for id / cwd / git / provider (trap 3);
-- track the running `turn_context.payload.model` to attribute usage;
-- read the **last** `token_count.info.total_token_usage`, or sum
-  `last_token_usage` — never sum totals (trap 1);
+- track the running `turn_context.payload.model` to attribute usage, and
+  register every declared model even if no token row follows it — a
+  superseded `azureml://` turn is a detection signal (trap 7);
+- attribute **cumulative-delta** tokens from
+  `token_count.info.total_token_usage` — never sum `last_token_usage`
+  (restated rows double-count; trap 1 as corrected);
 - count errors from `patch_apply_end.success == false` plus
   `mcp_tool_call_end` `Err`/`isError`, plus `exec_command_end.status ==
   "failed"` on pre-0.140 files, and report the signal as partial (§3);
