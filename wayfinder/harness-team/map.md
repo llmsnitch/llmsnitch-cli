@@ -126,6 +126,13 @@ tickets append below as they resolve)*
   shared pricing table, unknown model = first-class signal; lazy + explicit
   ingestion with cursors; DeepSeek = `deferred` tier until stdlib zstd.
   Six new `CONTEXT.md` terms.
+- [T103 — Dossier format](tickets/T103-dossier-format.md) — format proven
+  by writing the real claude-code dossier (`dossiers/claude-code.md`):
+  `dossiers/<harness>.md` at repo root, 9 fixed sections, evidence-dated
+  facts, per-signal confidence, closing copy-paste C1 entry draft. Bonus
+  captures: **observed signing id** for claude-code
+  (`com.anthropic.claude-code`, team `Q6L2SF6YDW`) and the
+  `toolUseResult.interrupted` error-signal trap.
 
 ## Not yet specified
 
