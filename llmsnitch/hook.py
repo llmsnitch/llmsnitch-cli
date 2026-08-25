@@ -10,6 +10,7 @@ Secrets are redacted BEFORE anything touches disk.
 import json
 import re
 import sys
+import unicodedata
 
 from . import store, transcript
 
@@ -32,12 +33,57 @@ _SECRET = re.compile(
 
 _MAX_STR = 2000   # per-string cap: traces are for auditing, not archiving blobs
 
+# UTR #36 / UAX #9 invisible + bidi + variation-selector + Tag codepoints.
+# Matches Ramparts src/normalize.rs::is_invisible — see
+# docs/research/unicode-evasion-redaction.md for the derivation, benchmarks,
+# and the honest-limits list (Cyrillic homoglyphs, base64 wrapping, and
+# soft-hyphen splits are documented non-goals).
+_INV_RE = re.compile(
+    "["
+    "\u200b-\u200f"          # ZWSP, ZWNJ, ZWJ, LRM, RLM
+    "\u2060-\u2064"          # word joiner, invisible operators
+    "\u202a-\u202e"          # LRE/RLE/PDF/LRO/RLO (Trojan Source)
+    "\u2066-\u2069"          # LRI/RLI/FSI/PDI
+    "\ufeff"                  # BOM / zero-width no-break space
+    "\ufe00-\ufe0f"          # variation selectors
+    "\U000e0000-\U000e007f"  # Unicode Tags block
+    "]"
+)
+
+
+def _canonical(s):
+    """Fold Unicode evasion into scannable form: strip invisibles, NFKC.
+
+    Cost tiers, measured on 2 KB strings (this machine, CPython 3):
+    pure ASCII exits on one C-level `isascii()` call (~0.07 µs — the
+    overwhelmingly common case, and the one the hot-path budget is about);
+    benign non-ASCII pays a regex search miss + NFKC (~24 µs — rare in
+    agent traffic); strings actually carrying an invisible codepoint, i.e.
+    attack-shaped input, pay search + strip + fold (~56 µs). Keep it
+    tiered: a per-char Python loop costs ~280 µs and must not come back.
+    """
+    if s.isascii():
+        return s
+    if _INV_RE.search(s):
+        s = _INV_RE.sub("", s)
+    return unicodedata.normalize("NFKC", s)
+
 
 def _clean(obj, depth=0):
     if depth > 6:
         return "<deep>"
     if isinstance(obj, str):
-        return _SECRET.sub("<redacted>", obj[:_MAX_STR])
+        s = obj[:_MAX_STR]
+        canon = _canonical(s)
+        if canon != s:
+            red_c = _SECRET.sub("<redacted>", canon)
+            if red_c != canon:
+                # A secret only visible after folding (zero-width split,
+                # fullwidth homoglyph, bidi override). Store the redacted
+                # canonical view — losing the original bytes is the right
+                # trade for a secret; benign non-ASCII takes the raw path.
+                return red_c
+        return _SECRET.sub("<redacted>", s)
     if isinstance(obj, dict):
         return {str(k)[:100]: _clean(v, depth + 1) for k, v in list(obj.items())[:50]}
     if isinstance(obj, list):

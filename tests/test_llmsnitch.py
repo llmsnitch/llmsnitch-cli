@@ -73,6 +73,29 @@ def test_redactor_covers_bearer_and_pem():
     _with_tmp_store(body)
 
 
+def test_redactor_defeats_unicode_evasion():
+    """Zero-width splits, fullwidth homoglyphs, and bidi overrides must not
+    smuggle a secret past _SECRET; benign non-ASCII must survive untouched."""
+    zw = "sk-" + "\u200b".join("abcdefghijklmnop1234")   # zero-width splits
+    full = "\uff53\uff4b-" + "".join(                     # fullwidth → sk-…
+        chr(0xFF21 + i) for i in range(10)) + "\uff11\uff12\uff13\uff14"
+    bidi = "sk-abc\u202edefghijklmnop99"                  # RLO inside token
+    benign = "naïve café — ünïcode is fine"
+    def body(t):
+        hook.handle("PreToolUse", _payload(
+            "PreToolUse", tool_name="Bash",
+            tool_input={"a": zw, "b": full, "c": bidi, "d": benign}))
+        raw = (t / "sessions" / "s1" / "events.ndjson").read_text()
+        ev = json.loads(raw.splitlines()[0])
+        vals = ev["input"]
+        for key, evaded in (("a", zw), ("b", full), ("c", bidi)):
+            assert vals[key] != evaded, f"{key}: evaded secret reached disk"
+            assert "<redacted>" in vals[key], f"{key}: not redacted"
+        assert "abcdefghijklmnop1234" not in raw, "folded secret reached disk"
+        assert vals["d"] == benign, "benign non-ASCII was mangled"
+    _with_tmp_store(body)
+
+
 def test_hook_never_fails_on_garbage():
     def body(t):
         assert hook.handle("PreToolUse", io.StringIO("not json {{{")) == 0
