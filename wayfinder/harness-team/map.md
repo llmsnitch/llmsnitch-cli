@@ -133,6 +133,14 @@ tickets append below as they resolve)*
   captures: **observed signing id** for claude-code
   (`com.anthropic.claude-code`, team `Q6L2SF6YDW`) and the
   `toolUseResult.interrupted` error-signal trap.
+- [T104 — Team design](tickets/T104-team-design.md) — `team/` = README
+  playbook + roster + 4 role files + per-run journals. Six phases with
+  checkable gates (triage → dossier → adapter → verify → doctrine audit →
+  commit); one commit per phase; one orchestrating session per harness run
+  spawning roles as subagents; researcher gets curl-only design-time
+  network; Pi + Prime Agent collapse into one run via `derived-of`.
+  Sources of truth (contract, dossier exemplar, roster) are pointed at,
+  never restated.
 
 ## Not yet specified
 
