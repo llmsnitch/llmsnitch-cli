@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T103, T104`
-`status: OPEN`
+`status: DONE (2026-08-24) — contract at ../../docs/harness-adapter-contract.md, glossary updated in ../../CONTEXT.md`
 
 ## Question
 
@@ -43,4 +43,40 @@ HITL: grill + domain-model with the user; new terms land in `CONTEXT.md`.
 
 ## Resolution
 
-*(append decision summary here, close, and index on the map)*
+Resolved 2026-08-24 via 16 grilling questions over 3 rounds (Q1–Q16, HITL).
+Full contract: `docs/harness-adapter-contract.md` (C1–C9 + acceptance
+checklist). The decisions, gisted:
+
+- **Purpose reframe (the big one)**: llmsnitch is a *tripwire, not a meter*.
+  Cost = detection signal for model use without the user's knowledge
+  (low-resolution by design); errors = suspicion proxy, not troubleshooting;
+  an unknown model id is itself a first-class signal (Q4, Q5, Q8).
+- **Form**: data-first hybrid — declarative built-in entry per harness +
+  optional code hook only where formats diverge (SQLite, odd JSONL);
+  registry fields ride the same entry (Q1, map D14).
+- **Ledger-first, no installer seam**: parsing what the harness already
+  wrote is the universal required mode; adapters never install hooks or
+  modify the harness (read-only, stealth-friendly). Claude's hook path
+  stays as out-of-contract bootstrap/enrichment, and Claude also gets a
+  ledger adapter — hook-vs-ledger diff is a standing correctness check
+  (Q2, Q7, Q11, Q16).
+- **zstd/DeepSeek**: admission PASS, tier `deferred` until stdlib zstd
+  (Python 3.14) — decoder problem, not cloud problem (Q3).
+- **Signal set (closed)**: model ids, tokens per model, session start/end,
+  cwd/project, error count. Test-verifier gates on it mechanically;
+  unsupplied gate signals are skipped *visibly* in `check` (Q9, Q5).
+- **Store**: full normalization into the existing events.ndjson + meta.json
+  shape — additive `harness` field (absent ⇒ claude-code), provenance on
+  ledger rows, namespaced session ids. Tool events/lifecycle/usage only —
+  **message bodies are never copied** (structural PII sanitization);
+  copied fields get _clean + _SECRET + NFKC + caps (Q10, Q14, Q15, Q6).
+- **Pricing**: one coarse shared table, provider-family rates, design-time
+  generation with citations, no invented prices, unknown-model flag (Q8).
+- **Ingestion**: lazy sweep on list/show/check + explicit `ingest`
+  subcommand; cursors in `ingest-state.json`; idempotent; no daemon (Q13).
+- **Contract location**: `docs/harness-adapter-contract.md`; six new terms
+  in `CONTEXT.md` (Ledger, Signal set, Ingest cursor, Provenance,
+  Deferred tier; Harness adapter redefined) (Q12).
+
+Deferred: `[gate.<harness>]` overrides (trimmed in Q6), watcher-triggered
+ingestion, notifier category for unknown-model.

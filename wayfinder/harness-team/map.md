@@ -116,19 +116,28 @@ tickets append below as they resolve)*
   `~/.codex/hooks.json`). 7 admission PASS, 3 needs-probe (Cursor, Grok
   Build, Junie), Claude Desktop split (see Out of scope). Feeds T102: zstd
   tier question; feeds T104: Pi/Prime Agent one-adapter collapse.
+- [T102 — Harness-adapter contract](tickets/T102-adapter-contract.md) —
+  contract accepted at `docs/harness-adapter-contract.md` (C1–C9).
+  **Purpose reframe: tripwire, not meter** — cost and errors are detection
+  signals for model use without the user's knowledge. Ledger-first
+  universal ingestion, no installer seam (adapters never modify the
+  harness); data-first hybrid form; closed signal set; full normalization
+  into the existing store shape, message bodies never copied; one coarse
+  shared pricing table, unknown model = first-class signal; lazy + explicit
+  ingestion with cursors; DeepSeek = `deferred` tier until stdlib zstd.
+  Six new `CONTEXT.md` terms.
 
 ## Not yet specified
 
 - **Per-harness dashboard parity** — extending the already-decided reporting
   surfaces (terminal summary, digest, TUI pane) to every supported harness.
   Sharpens after the adapter contract and first non-Claude adapters exist.
-- **Support tiers for hook-less harnesses** — some union harnesses likely
-  have no hook system; whether transcript-only ingestion counts as parity or
-  a documented tier sharpens inside the adapter-contract grilling
-  ([T102](tickets/T102-adapter-contract.md)).
-- **Per-provider offline pricing** — non-Anthropic models need their own
-  zero-network pricing tables and unknown-model fallbacks; shape emerges from
-  T102/T103.
+- **Watcher-triggered ingestion** — an fs-coil watcher event nudging a
+  ledger sweep, replacing pure laziness; sharpens once the notifier effort's
+  watcher lands (contract C8 defers it).
+- **Per-harness gate config** (`[gate.<harness>]` overrides) — trimmed from
+  the T102 grilling (Q6); revisit only if per-harness thresholds are ever
+  actually wanted.
 - **Signing-id observation procedure** — registry entries for new harnesses
   need observed (never guessed) signing ids per the notifier spec's open
   question; becomes per-harness work during team runs.
