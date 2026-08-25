@@ -129,14 +129,20 @@ Codex is `ledger` tier; the ledger is the only ingest path.
 
 ## 6. Config paths (scan-seed context, not ingested)
 
-`~/.codex/config.toml` (user), `~/.codex/<name>.config.toml` (profile
-overlays selected with `--profile`), `/etc/codex/config.toml` (system),
-`<project>/.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/skills/`,
-`~/.agents/skills/`, `<project>/.agents/skills/`, `~/.codex/plugins/` with
-`.codex-plugin/plugin.json` (Claude-compat `.claude-plugin` fallback),
-`~/.codex/rules/`, `~/.codex/hooks.json`. Consumed later by the scan MVP's
-seed table; listed here because the dossier is the single per-harness fact
-sheet (map D15).
+**Observed present on this machine** (2026-08-25): `~/.codex/config.toml`,
+`~/.codex/hooks.json`, `~/.codex/AGENTS.md`, `~/.codex/skills/`,
+`~/.codex/rules/`, `~/.codex/plugins/`, `~/.agents/skills/`.
+
+**Documented but NOT present here** — carried from snyk-agent-scan's path
+table, unverified on this machine, so treat as candidate paths rather than
+facts: `/etc/codex/config.toml` (system-wide; `/etc/codex` does not exist
+here), `~/.codex/<name>.config.toml` (profile overlays selected with
+`--profile`), `<project>/.codex/config.toml`, `<project>/.agents/skills/`,
+and the `.codex-plugin/plugin.json` manifest (Claude-compat
+`.claude-plugin` fallback) inside `~/.codex/plugins/`.
+
+Consumed later by the scan MVP's seed table; listed here because the dossier
+is the single per-harness fact sheet (map D15).
 
 **`~/.codex/auth.json` and `config.toml` are credential-bearing** — mode
 0600 on this machine. Seed them as *paths to notice writes to*; never read
@@ -236,9 +242,9 @@ refused, and nothing was lost — only the path is needed.)
     "session_paths": ["~/.codex/sessions/*/*/*/rollout-*.jsonl"],  # honour $CODEX_HOME
     "session_format": "jsonl",
     "config_paths": [
-        "~/.codex/config.toml",
-        "~/.codex/hooks.json",
-        "/etc/codex/config.toml",
+        "~/.codex/config.toml",   # observed 2026-08-25
+        "~/.codex/hooks.json",    # observed 2026-08-25
+        "/etc/codex/config.toml", # documented only — absent on this machine
     ],
     "registry": {
         "paths": ["~/.codex"],
