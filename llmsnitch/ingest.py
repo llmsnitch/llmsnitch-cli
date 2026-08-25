@@ -10,9 +10,23 @@ Corrupt/missing state means a full re-sweep, never a crash.
 import glob
 import json
 import os
+import re
 
 from . import harness, store
 from .hook import _clean
+
+# The watched harness is the adversary: a hostile session id must not steer
+# our writes (no separators, no traversal). Unsafe ids fall back to the
+# sanitized filename stem.
+_SAFE_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+
+def _safe_native_id(parsed, path):
+    nid = parsed.get("native_id")
+    if isinstance(nid, str) and _SAFE_ID.fullmatch(nid):
+        return nid
+    stem = os.path.basename(path).rsplit(".", 1)[0]
+    return re.sub(r"[^A-Za-z0-9._-]", "_", stem)[:64] or "unnamed"
 
 
 def _state_path():
@@ -44,7 +58,7 @@ def _session_files(entry):
 
 
 def _write_session(name, path, parsed):
-    sid = f"{name}-{parsed.get('native_id') or os.path.basename(path).rsplit('.', 1)[0]}"
+    sid = f"{name}-{_safe_native_id(parsed, path)}"
     src = harness.src_info(path)
     sdir = store.session_dir(sid)
     ev_path = sdir / "events.ndjson"
@@ -59,7 +73,7 @@ def _write_session(name, path, parsed):
     models = parsed["models"]
     store.write_meta(sid, {
         "v": 1, "session_id": sid, "harness": name,
-        "native_id": parsed.get("native_id"),
+        "native_id": _clean(str(parsed.get("native_id") or "")),
         "cwd": _clean(str(parsed.get("cwd") or "")),
         "provider": _clean(str(parsed.get("provider") or "")),
         "models": sorted(models),

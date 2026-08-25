@@ -81,7 +81,7 @@ def parse_codex(path):
                 provider = p.get("model_provider")
             elif t == "turn_context":
                 if p.get("model"):
-                    model = str(p["model"])
+                    model = _clean(str(p["model"]))[:200]   # harness-controlled string
                     # verifier defect 2b: a declared model must survive even
                     # with no attributed spend (e.g. a superseded azureml://
                     # turn — trap 7's detection signal).
@@ -136,6 +136,13 @@ HARNESSES = {
     "claude-code": {
         "session_paths": ["~/.claude/projects/*/*.jsonl"],
         "session_format": "jsonl",
+        "config_paths": ["~/.claude/settings.json", "~/.claude.json"],
+        "registry": {
+            "paths": ["~/.claude"],
+            "exes": ["claude"],
+            "signing_ids": ["com.anthropic.claude-code"],  # observed 2026-08-24, team Q6L2SF6YDW
+            "cache_paths": ["~/.claude/plugins/cache"],
+        },
         "parser": None,
         "tier": "live+ledger",
         "provider_families": {"": "anthropic"},
@@ -146,6 +153,18 @@ HARNESSES = {
         "home_env": "CODEX_HOME",               # trap 9: relocates ~/.codex
         "home_default": "~/.codex",
         "session_format": "jsonl",
+        "config_paths": ["~/.codex/config.toml", "~/.codex/hooks.json",
+                         "/etc/codex/config.toml"],
+        "registry": {
+            "paths": ["~/.codex"],
+            "exes": ["codex"],
+            "signing_ids": ["codex"],           # observed 2026-08-25, team 2DC432GLL2
+            "cache_paths": ["~/.codex/cache", "~/.codex/.tmp", "~/.codex/tmp",
+                            "~/.codex/log", "~/.codex/shell_snapshots",
+                            "~/.codex/thread-writer-locks",
+                            "~/.codex/models_cache.json",
+                            "~/.codex/cloud-config-bundle-cache.json"],
+        },
         "parser": parse_codex,
         "tier": "ledger",
         "provider_families": {"gpt-": "openai", "o1": "openai", "o3": "openai",

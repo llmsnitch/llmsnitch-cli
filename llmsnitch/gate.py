@@ -106,6 +106,11 @@ def cmd_check(cfg, out):
         return EXIT_OPERATIONAL
 
     verdict, findings = evaluate(cfg, summaries)
+    # Honest disablement (contract C4): a health verdict computed over a
+    # knowingly-incomplete error signal must say so, pass or breach.
+    for note in sorted({s["signals_partial"] for s in summaries
+                        if s.get("signals_partial")}):
+        out.write(f"health: partial — {note}\n")
     if verdict == "pass":
         mode_note = (" [subscription: cost gate disabled]"
                      if cfg["billing_mode"] == "subscription" else "")

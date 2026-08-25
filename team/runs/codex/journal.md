@@ -84,3 +84,33 @@ Non-blocking follow-ups: fixture's azureml turn_context ordering differs
 from the real (superseded-first) shape; `list` ID column collides at 14
 chars on prefixed UUIDv7 ids (17/84) — shared-renderer cosmetic issue.
 verdict: PASS
+
+## Phase 5 — Doctrine audit (attempt 1)
+started: 2026-08-25 01:20 EDT   finished: 2026-08-25 01:27 EDT
+evidence: adversarial auditor report; independently reproduced phase-4
+numbers (oracle 84/84, distribution, zero ~/.codex writes) rather than
+trusting them. 6/9 checklist items ticked with evidence. Doctrine gates
+PASS (nothing pages; signals recorded not paged). Purpose PASS (no
+invented prices, no metering drift).
+Findings: F1 registry half (C9) never transcribed from dossier §8 into
+HARNESSES — actor attribution impossible, cache_paths suppression list
+missing; F2 `check` silent about knowingly-partial error signal (health
+100 on sessions whose shell errors are invisible); F3 no-writes item not
+test-asserted. Non-blocking: N1 path traversal via hostile
+session_meta.id (REPRODUCED — writes escaped the sessions root); N2 model
+ids bypass _clean; N3 dossier §3 stale token reading; N4 "unknown" bucket
+ambiguity; N5 provider_families inert until the pricing module exists;
+N6 ID-column collisions (already journaled).
+verdict: FAIL → returned to Phase 3 per README failure handling
+
+## Phase 3 (fix 2) — Adapter
+started: 2026-08-25 01:28 EDT   finished: 2026-08-25 01:33 EDT
+evidence: F1 registry+config_paths transcribed into both HARNESSES entries
+(signing ids observed-not-guessed, dated); F2 `check` now prints
+`health: partial — <note>` on pass and breach paths; F3 new
+test_codex_sweep_never_touches_ledger (hash+listing+mtime_ns before/after);
+N1 fixed (_safe_native_id allowlist, fallback sanitized stem) + new
+test_codex_hostile_native_id_cannot_escape_store (traversal repro now
+caught); N2 model ids through _clean capped 200; N3 dossier §3 corrected.
+Local run: 22/22 passed.
+verdict: PASS

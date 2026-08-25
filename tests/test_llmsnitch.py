@@ -321,6 +321,40 @@ def test_codex_store_modes_and_list_column():
         cli.cmd_show(_CODEX_SID, out)
         assert "harness   codex" in out.getvalue()
         assert "partial" in out.getvalue(), "degraded error signal must be visible"
+        from llmsnitch import gate
+        out = _io.StringIO()
+        gate.cmd_check(dict(gate.DEFAULTS), out)
+        assert "health: partial" in out.getvalue(), \
+            "check must surface partial signals (contract C4)"
+    _with_codex_fixture(body)
+
+
+def test_codex_sweep_never_touches_ledger():
+    import hashlib
+    from llmsnitch import ingest
+    def body(t, fx):
+        before = (hashlib.sha256(fx.read_bytes()).hexdigest(),
+                  sorted(os.listdir(fx.parent)), fx.stat().st_mtime_ns)
+        ingest.sweep()
+        after = (hashlib.sha256(fx.read_bytes()).hexdigest(),
+                 sorted(os.listdir(fx.parent)), fx.stat().st_mtime_ns)
+        assert before == after, "sweep must never write into harness territory"
+    _with_codex_fixture(body)
+
+
+def test_codex_hostile_native_id_cannot_escape_store():
+    from llmsnitch import ingest
+    def body(t, fx):
+        evil = fx.parent / "rollout-evil.jsonl"
+        evil.write_text('{"timestamp":"2026-08-20T10:00:00.000Z",'
+                        '"type":"session_meta","payload":'
+                        '{"id":"../../../ESCAPED","cwd":"/tmp"}}\n')
+        ingest.sweep()
+        assert not list(Path(t).rglob("ESCAPED")), "traversal escaped the store"
+        names = [d.name for d in (t / "sessions").iterdir()]
+        assert all("/" not in n and ".." not in n for n in names), names
+        assert (t / "sessions" / "codex-rollout-evil").is_dir(), \
+            "hostile id must fall back to sanitized filename stem"
     _with_codex_fixture(body)
 
 
