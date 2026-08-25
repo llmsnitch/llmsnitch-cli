@@ -9,7 +9,7 @@ the argument). Status: `pending` | `in-run` | `done` | `deferred` |
 | Rank | Harness | Tier | Status | Derived-of | Notes |
 |---|---|---|---|---|---|
 | — | claude-code | live+ledger | done (live); ledger adapter pending | — | rank-exempt; dossier exists; ledger adapter is a future run (contract C2 diff-check) |
-| 1 | codex | ledger | pending | — | **pilot** (T106); installed here; JSONL `~/.codex/sessions/` |
+| 1 | codex | ledger | in-run | — | **pilot** (T106); installed here; JSONL `~/.codex/sessions/` |
 | 2 | cursor | — | needs-probe | — | undocumented `state.vscdb` schema; probe before ticketing a run |
 | 3 | openclaw | ledger | pending | — | `~/.openclaw/agents/<id>/sessions/` |
 | 4 | opencode | ledger | pending | — | SQLite `~/.local/share/opencode/opencode*.db` |
