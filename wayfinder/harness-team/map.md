@@ -141,6 +141,9 @@ tickets append below as they resolve)*
   network; Pi + Prime Agent collapse into one run via `derived-of`.
   Sources of truth (contract, dossier exemplar, roster) are pointed at,
   never restated.
+- [T105 — Author the team](tickets/T105-author-team.md) — `team/` authored:
+  README playbook, 12-harness roster, four role files. Baseline 16/16
+  tests green. A fresh session starts a run from `team/README.md` unaided.
 
 ## Not yet specified
 
