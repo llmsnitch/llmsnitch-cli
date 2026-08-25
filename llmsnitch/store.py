@@ -104,8 +104,12 @@ def summarize(session_id):
             if ev.get("error"):
                 errors += 1
     meta = read_meta(session_id)
+    if "error_count" in meta:   # ledger sessions: errors come from meta (C4)
+        errors = meta["error_count"]
     return {
         "session_id": session_id,
+        "harness": meta.get("harness", "claude-code"),
+        "signals_partial": meta.get("signals_partial"),
         "started_at": meta.get("started_at") or first_ts,
         "ended_at": meta.get("ended_at") or last_ts,
         "duration_s": round((last_ts - first_ts), 1) if first_ts and last_ts else 0,

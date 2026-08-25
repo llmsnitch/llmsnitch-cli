@@ -19,3 +19,20 @@ skew (#2), second-session_meta parent-id trap (#3), decayed shell-error
 signal (#5). Observed signing id: identifier `codex`, team `2DC432GLL2`.
 Oracle: `state_5.sqlite` threads.tokens_used == ledger totals on 84/84.
 verdict: PASS
+
+## Phase 3 — Adapter
+started: 2026-08-25 00:35 EDT   finished: 2026-08-25 01:05 EDT
+deviation: implementer subagent died twice on API connection drops
+(ECONNRESET) with zero files written; orchestrator absorbed the
+implementer role per README failure handling. Phases 4–5 stay
+independent agents.
+evidence: new `llmsnitch/harness.py` (HARNESSES registry + codex parser
+honouring dossier traps 1/3/9/12/13), `llmsnitch/ingest.py` (C8 sweep,
+cursors in ingest-state.json, idempotent rewrite-on-change),
+`llmsnitch/store.py` + `llmsnitch/cli.py` surgical edits (harness column,
+`ingest` subcommand, lazy sweep, visible partial-health line),
+`tests/fixtures/codex-rollout.jsonl` (synthetic; exercises cumulative-token
+trap, parent session_meta, interrupted-not-error, seeded fake secret,
+body-class rows) + 4 new tests. Local run: 20/20 passed.
+zero writes outside the repo; ~/.codex untouched.
+verdict: PASS

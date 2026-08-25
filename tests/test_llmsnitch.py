@@ -226,6 +226,98 @@ def test_setup_refuses_inside_claude_and_snapshots():
         assert json.loads(sp.read_text()) == cfg1, "second run must be a no-op"
 
 
+_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "codex-rollout.jsonl"
+_CODEX_SID = "codex-0199aaaa-bbbb-7ccc-8ddd-eeeeffff0001"
+
+
+def _with_codex_fixture(fn):
+    """Temp store + codex entry pointed at a temp copy of the fixture."""
+    from llmsnitch import harness
+
+    def body(t):
+        led = Path(t) / "ledger"
+        led.mkdir()
+        fx = led / "rollout-fixture.jsonl"
+        fx.write_text(_FIXTURE.read_text())
+        old = harness.HARNESSES["codex"]["session_paths"]
+        harness.HARNESSES["codex"]["session_paths"] = [str(led / "rollout-*.jsonl")]
+        try:
+            fn(Path(t), fx)
+        finally:
+            harness.HARNESSES["codex"]["session_paths"] = old
+    _with_tmp_store(body)
+
+
+def test_codex_ledger_signal_set():
+    from llmsnitch import ingest
+    def body(t, fx):
+        assert ingest.sweep() == 1
+        meta = json.loads((t / "sessions" / _CODEX_SID / "meta.json").read_text())
+        assert meta["harness"] == "codex" and meta["native_id"].endswith("0001")
+        assert meta["cwd"] == "/tmp/proj", "cwd must come from FIRST session_meta"
+        tok = meta["tokens_by_model"]["gpt-5.5"]
+        assert tok["input_tokens"] == 140 and tok["output_tokens"] == 80
+        assert tok["total_tokens"] == 250, "sum last_token_usage, never totals"
+        assert meta["total_tokens"] == 250
+        assert meta["error_count"] == 2, "mcp+patch errors; interrupted excluded"
+        assert meta["started_at"] and meta["ended_at"] > meta["started_at"]
+        assert meta["signals_partial"] and meta["cost_usd"] is None
+        assert meta["src"]["sha256"]
+        for line in (t / "sessions" / _CODEX_SID / "events.ndjson").read_text().splitlines():
+            ev = json.loads(line)
+            assert ev["harness"] == "codex" and ev["src_sha256"], "row provenance"
+    _with_codex_fixture(body)
+
+
+def test_codex_bodies_and_secrets_never_stored():
+    from llmsnitch import ingest
+    def body(t, fx):
+        ingest.sweep()
+        for p in Path(t).rglob("*"):
+            if p.is_file() and p.name != "rollout-fixture.jsonl":
+                raw = p.read_text()
+                assert "sk-test1234567890abcdef" not in raw, p
+                assert "MUSTNOTCOPY" not in raw, p
+    _with_codex_fixture(body)
+
+
+def test_codex_cursor_idempotent_and_incremental():
+    from llmsnitch import ingest
+    def body(t, fx):
+        assert ingest.sweep() == 1
+        assert ingest.sweep() == 0, "unchanged file must be skipped"
+        row = ('{"timestamp":"2026-08-20T10:06:00.000Z","type":"event_msg",'
+               '"payload":{"type":"token_count","info":{"last_token_usage":'
+               '{"input_tokens":10,"cached_input_tokens":0,"output_tokens":40,'
+               '"reasoning_output_tokens":0,"total_tokens":50}}}}\n')
+        with open(fx, "a") as f:
+            f.write(row)
+        assert ingest.sweep() == 1
+        meta = json.loads((t / "sessions" / _CODEX_SID / "meta.json").read_text())
+        assert meta["total_tokens"] == 300, "re-ingest must not double-count"
+    _with_codex_fixture(body)
+
+
+def test_codex_store_modes_and_list_column():
+    import io as _io
+    from llmsnitch import cli, ingest
+    def body(t, fx):
+        ingest.sweep()
+        sdir = t / "sessions" / _CODEX_SID
+        assert oct(sdir.stat().st_mode)[-3:] == "700"
+        for f in ("meta.json", "events.ndjson"):
+            assert oct((sdir / f).stat().st_mode)[-3:] == "600", f
+        out = _io.StringIO()
+        cli.cmd_list(out)
+        text = out.getvalue()
+        assert "HARNESS" in text and "codex" in text
+        out = _io.StringIO()
+        cli.cmd_show(_CODEX_SID, out)
+        assert "harness   codex" in out.getvalue()
+        assert "partial" in out.getvalue(), "degraded error signal must be visible"
+    _with_codex_fixture(body)
+
+
 def test_no_network_imports():
     pkg = Path(__file__).resolve().parent.parent / "llmsnitch"
     for p in pkg.glob("*.py"):
