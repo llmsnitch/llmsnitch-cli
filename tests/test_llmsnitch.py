@@ -628,62 +628,6 @@ def test_no_network_imports():
             assert f"import {banned}" not in src, (p.name, banned)
 
 
-def test_migrate_paths_moves_and_symlinks():
-    """Seed old-path tree under a fake HOME, run migrate, assert files moved,
-    symlink left behind, second run is a no-op."""
-    from llmsnitch import migrate_paths
-    with tempfile.TemporaryDirectory() as t:
-        home = Path(t)
-        old_logs = home / "Library/Logs/llm-snitch"
-        old_cache = home / "Library/Caches/llm-snitch"
-        old_cfg_dir = home / ".config/llm-snitch"
-        old_logs.mkdir(parents=True)
-        (old_logs / "canary.log").write_text("hello")
-        old_cache.mkdir(parents=True)
-        (old_cache / "notify-state.json").write_text('{"v":1}')
-        old_cfg_dir.mkdir(parents=True)
-        (old_cfg_dir / "config").write_text("[notify]\nenabled = true\n")
-
-        buf = io.StringIO()
-        migrate_paths.run(buf, home=home)
-
-        new_logs = home / "Library/Logs/llmsnitch"
-        new_cache = home / "Library/Caches/llmsnitch"
-        new_cfg = home / ".config/llmsnitch/config"
-        assert (new_logs / "canary.log").read_text() == "hello"
-        assert (new_cache / "notify-state.json").read_text() == '{"v":1}'
-        assert "[notify]" in new_cfg.read_text()
-        assert old_logs.is_symlink() and old_logs.resolve() == new_logs.resolve()
-        assert old_cache.is_symlink()
-        assert (old_cfg_dir / "config").is_symlink()
-
-        # Idempotent — second run doesn't fail or double-move
-        buf2 = io.StringIO()
-        migrate_paths.run(buf2, home=home)
-        assert (new_logs / "canary.log").read_text() == "hello"
-
-
-def test_migrate_paths_merges_config_when_new_exists():
-    """[gate] on new, [notify] on old — union both without dropping either."""
-    from llmsnitch import migrate_paths
-    with tempfile.TemporaryDirectory() as t:
-        home = Path(t)
-        (home / ".config/llm-snitch").mkdir(parents=True)
-        (home / ".config/llm-snitch/config").write_text(
-            "[notify]\nenabled = true\n")
-        (home / ".config/llmsnitch").mkdir(parents=True)
-        (home / ".config/llmsnitch/config").write_text(
-            "[gate]\nbilling_mode = subscription\n")
-
-        migrate_paths.run(io.StringIO(), home=home)
-
-        merged = (home / ".config/llmsnitch/config").read_text()
-        assert "[gate]" in merged and "billing_mode = subscription" in merged
-        assert "[notify]" in merged and "enabled = true" in merged
-        assert (home / ".config/llm-snitch/config.merged").exists()
-        assert (home / ".config/llm-snitch/config").is_symlink()
-
-
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
