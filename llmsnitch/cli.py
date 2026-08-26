@@ -4,13 +4,14 @@
   llmsnitch list              recorded sessions, newest first
   llmsnitch show <id>         one session: aggregates + recent events
   llmsnitch check             cost/fail-rate/health gate (exit 0/1/2)
+  llmsnitch scan [ROOT ...]   config audit over agent artifacts (exit 0/1/2)
   llmsnitch hook <event>      internal — invoked by Claude Code hooks
 """
 
 import sys
 from datetime import datetime
 
-from . import __version__, gate, hook, setup_cmd, store
+from . import __version__, gate, hook, scan, setup_cmd, store
 
 
 def _cost_label(cost, subscription):
@@ -98,6 +99,8 @@ def main(argv=None):
         return cmd_show(argv[1], out)
     if cmd == "check":
         return gate.cmd_check(gate.load_cfg(), out)
+    if cmd == "scan":
+        return scan.cmd_scan(argv[1:], out)
     if cmd in ("--version", "version"):
         out.write(f"llmsnitch {__version__}\n")
         return 0
