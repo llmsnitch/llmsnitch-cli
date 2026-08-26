@@ -370,7 +370,30 @@ def run_scan(roots=None, rebaseline=False):
     mp = d / "meta.json"
     mp.write_text(json.dumps(meta, indent=2))
     store._chmod_private(mp)
+    _route_to_notifier(findings)
     return meta, findings
+
+
+def _route_to_notifier(findings):
+    """Additional outlet, not a replacement: every finding becomes a notify
+    ledger row; the (scan_finding, actor_bucket) novelty tuple means at most
+    one banner per agent per window regardless of finding count — per-finding
+    detail lives here and in the scan report. info/low findings carry no
+    decision and are record_only (AGENTS.md doctrine) — except drift, which
+    always names a decision (rebaseline or revert)."""
+    try:
+        from fs_coil import notify as fs_notify
+    except ImportError:   # pip-installed llmsnitch without the vendored tree
+        return
+    for f in findings:
+        if f.get("resolved"):
+            continue
+        fs_notify.notify(   # never raises (fail-closed by contract)
+            "config-audit", "scan_finding",
+            f"{f['rule_id']}: {f['artifact']}",
+            actor_bucket=f["agent"],
+            record_only=(f["severity"] in ("info", "low")
+                         and not f["rule_id"].startswith("drift_")))
 
 
 # -- emitters ----------------------------------------------------------------

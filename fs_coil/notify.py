@@ -43,6 +43,7 @@ CATEGORIES = {
     "deny_read":              ("5m",  "high", "investigate; rotate the credential if unexpected"),
     "keychain_access":        ("5m",  "high", "check which item was read; rotate if unexpected"),
     "threshold_breach":       ("0",   "high", "review the session; kill the runaway session"),
+    "scan_finding":           ("24h", "high", "review the finding: llmsnitch scan"),
 }
 
 _SURFACE_SECTION = {          # fixed surface -> config-section map
@@ -50,6 +51,7 @@ _SURFACE_SECTION = {          # fixed surface -> config-section map
     "fs-coil-deep":  "notify.fs-coil",
     "session-shed":  "notify.session-shed",
     "agent-flick":   "notify.agent-flick",
+    "config-audit":  "notify.config-audit",
 }
 _GLYPH = {"fs-coil-deep": "🦍"}   # default 🐍 (light + wrappers)
 
