@@ -4,7 +4,22 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T204`
-`status: CLAIMED (2026-08-26, session 99b5a6f6)`
+`status: DONE (2026-08-26)`
+
+## Resolution
+
+- Merge commit on main: `1dc6dc2` (no conflicts; `.gitmodules` identical
+  both sides, no untracked collisions — verified pre-merge).
+- Suites on main: 31/31 + 8/8 + 18/18 green.
+- **Install mechanism (fact later tickets depend on)**: **pipx** — venv at
+  `~/Library/Application Support/pipx/venvs/llmsnitch` (Python 3.14.7),
+  shim at `~/.local/bin/llmsnitch`. Reinstall command that worked:
+  `pipx install --force $HOMERepos/llmsnitch`.
+- Installed-binary proof: `llmsnitch version` → 0.1.0; help lists `scan`;
+  `llmsnitch scan --inventory | tail -1` → `123 artifacts`.
+- Note for T202/T204: the plist's ProgramArguments path
+  `~/.local/bin/llmsnitch` is the pipx shim — correct and stable across
+  reinstalls.
 
 ## Question
 

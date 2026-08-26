@@ -37,6 +37,19 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
 
 <!-- one line per closed ticket: gist + link -->
 
+- [T201 — Merge scan MVP to main + reinstall](tickets/T201-merge-and-reinstall.md) —
+  merged as `1dc6dc2`, suites green on main; install is **pipx**
+  (`pipx install --force ~/Repos/llmsnitch`), shim at
+  `~/.local/bin/llmsnitch`; installed CLI serves the scan MVP.
+- [T202 — `llmsnitch patrol` subcommand + trigger stamp](tickets/T202-patrol-subcommand.md) —
+  built as `742fc15`: plist print/`--write` (idempotent bootstrap),
+  `scan --patrol` stamps `meta.trigger`; on-branch only — T204 carries
+  the second merge.
+- [T203 — Rule-pack expansion: SD-020 + SD-022 ports](tickets/T203-rule-pack-expansion.md) —
+  shipped as `2da768b`; SD-022 per ticket, SD-020 deviates twice toward
+  upstream (settings-only scope, hygiene/low category — the decision is
+  "quote it"); real-machine smoke clean.
+
 - Grilling round 1+2 (pre-charting, recorded here since they shaped the map):
   destination = operational rollout (a); track B out of scope; scheduled
   scans + rule-pack in, redact-retroactive out; merge is the first ticket;
