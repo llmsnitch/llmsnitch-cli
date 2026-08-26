@@ -162,3 +162,9 @@ DENY_RULES = [
     ("W",  "/**/.github/workflows/**"),
     ("W",  "/**/.vscode/tasks.json"),
 ]
+
+# Deny patterns tagged critical (notifier-spec D23): exact-equality strings
+# against a row's deny_pattern; critical pierces the cold-start window.
+# Ships empty — defaults must be conservative; users add via
+# `[notify] critical_patterns`.
+CRITICAL_DENY_PATTERNS = frozenset()
