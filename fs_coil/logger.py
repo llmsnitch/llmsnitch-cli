@@ -1,7 +1,7 @@
 """Logger + colorized log-line renderer.
 
 Logger writes plain-text log files per day into
-~/Library/Logs/llm-snitch/fs-coil/fs-coil-YYYY-MM-DD.log, chowns
+~/Library/Logs/llmsnitch/fs-coil/fs-coil-YYYY-MM-DD.log, chowns
 them to the console user when running as root, and TTY-colorizes the
 stdout echo. `_colorize_log_line` is reused by cmd_logs to paint the
 severity ramp onto the tail output.
@@ -82,7 +82,7 @@ def _colorize_log_line(line):
 class Logger:
     def __init__(self, user):
         home = user_home(user) if user else "/var/root"
-        self.dir = Path(home) / "Library" / "Logs" / "llm-snitch" / "fs-coil"
+        self.dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             for p in (self.dir, self.dir.parent):

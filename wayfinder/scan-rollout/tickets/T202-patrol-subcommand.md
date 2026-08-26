@@ -31,7 +31,7 @@ Build, on branch `research/scanner-survey-mvp`:
      (`com.slav-it.llmsnitch-patrol`) — daily `StartCalendarInterval`
      (pick a fixed morning time, e.g. 09:30), `ProgramArguments`
      `[~/.local/bin/llmsnitch, scan, --patrol]`, working dir `$HOME`,
-     `StandardErrorPath ~/Library/Logs/llm-snitch/patrol.err`
+     `StandardErrorPath ~/Library/Logs/llmsnitch/patrol.err`
      (+ StandardOutPath to `.out`), `RunAtLoad false`.
    - `--write`: write plist to `~/Library/LaunchAgents/` and
      `launchctl bootstrap gui/$UID` it (kickstart pattern:

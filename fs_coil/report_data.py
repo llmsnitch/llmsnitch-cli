@@ -24,8 +24,8 @@ def _report_data():
     """Collect everything the dashboard sections need in one pass."""
     user = console_user() or pwd.getpwuid(os.getuid()).pw_name
     home = user_home(user)
-    log_dir  = Path(home) / "Library" / "Logs"   / "llm-snitch" / "fs-coil"
-    icon_dir = Path(home) / "Library" / "Caches" / "llm-snitch" / "fs-coil" / "icons"
+    log_dir  = Path(home) / "Library" / "Logs"   / "llmsnitch" / "fs-coil"
+    icon_dir = Path(home) / "Library" / "Caches" / "llmsnitch" / "fs-coil" / "icons"
 
     all_matches = _parse_matches(log_dir, days=7)
     # --- Reporting rule for severity --------------------------------------

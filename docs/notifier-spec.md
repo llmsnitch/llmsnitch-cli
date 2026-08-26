@@ -35,7 +35,7 @@ enforces the three gates universally across every alert surface (D04).
 
 **Source-of-truth note for the executor**: the original fs-coil source repo
 was trashed; the only current code (including the T001 stopgap) is the
-root-owned installed tree at `/usr/local/share/llm-snitch/fs_coil/` and the
+root-owned installed tree at `/usr/local/share/llmsnitch/fs_coil/` and the
 wrapper scripts `/usr/local/bin/{fs-coil,session-shed,agent-flick}`.
 Migration ticket T003 vendors that tree into this repo (user decision,
 2026-08-19). Until T003 lands, treat `/usr/local` as read-only reference.
@@ -80,7 +80,7 @@ In scope — all llmsnitch alert surfaces (D02):
 | Surface id | What it is | Runs as |
 |---|---|---|
 | `fs-coil-light` | fswatch/FSEvents watcher (writes only, no FDA) | user LaunchAgent `com.slav-it.fs-coil` |
-| `fs-coil-deep` | eslogger watcher (reads + writes + execs, needs FDA) | root LaunchDaemon `com.slav-it.llm-snitch` |
+| `fs-coil-deep` | eslogger watcher (reads + writes + execs, needs FDA) | root LaunchDaemon `com.slav-it.llmsnitch` |
 | `session-shed` | agenttrace health-gate wrapper | user, periodic |
 | `agent-flick` | agent-strace cost-gate wrapper | user, periodic |
 | `config-audit` | `llmsnitch scan` — cold-path config audit over agent artifacts | user, on demand |
@@ -220,7 +220,7 @@ windowed category).
 `try/except Exception`. On any error: no banner, no ledger row (D21 is
 explicit: suppress everything), and best-effort — append
 `NOTIFIER-ERROR: <reason>` to the daily fs-coil log (the existing `Logger`,
-i.e. `~/Library/Logs/llm-snitch/fs-coil/fs-coil-YYYY-MM-DD.log`) and set
+i.e. `~/Library/Logs/llmsnitch/fs-coil/fs-coil-YYYY-MM-DD.log`) and set
 `degraded = "<reason>"` + `degraded_ts` in hot state. `notify()` returns
 False. Yes, this means a permission failure loses that event's row — the
 accepted D21 trade; the NOTIFIER-ERROR line and the degraded flag are the
@@ -362,7 +362,7 @@ per hour, not one per write).
 
 ### Event ledger — the cold trail (D08–D11)
 
-- **Location**: `~/Library/Logs/llm-snitch/notify/events-YYYY-MM-DD.ndjson`
+- **Location**: `~/Library/Logs/llmsnitch/notify/events-YYYY-MM-DD.ndjson`
   — one file per day. (D08 named `events.ndjson`; D11's daily rotation
   "matching fs-coil's existing pattern" resolves it to date-stamped daily
   files, exactly like `fs-coil-YYYY-MM-DD.log`. The filename is computed per
@@ -385,7 +385,7 @@ per hour, not one per write).
   immediately after creation, exactly the `Notifier._chown_user` pattern
   (with `follow_symlinks=False`) already used for icon caches. This applies
   to the ledger dir, daily ledger files, digest files, the
-  `~/Library/Caches/llm-snitch/` dir, `notify-state.json`, and
+  `~/Library/Caches/llmsnitch/` dir, `notify-state.json`, and
   `notify-state.lock`. The console user and home resolve via the existing
   `fs_coil.runtime.console_user()` / `user_home()` — the same resolution
   `Logger` uses; if there is no console user (boot, nobody logged in), the
@@ -438,7 +438,7 @@ the rest of llmsnitch).
 
 ### Hot state — the novelty index (D12, D13)
 
-- **Location**: `~/Library/Caches/llm-snitch/notify-state.json` (create the
+- **Location**: `~/Library/Caches/llmsnitch/notify-state.json` (create the
   directory `0700` on first use; nothing else lives there yet).
   `notify-state.json`, its `.tmp` and `.bak` siblings, and
   `notify-state.lock` are all `0600` (README's flat-file policy).
@@ -513,7 +513,7 @@ agent appears in novelty math; then surface-specific → global → code.)
 
 ## Config schema
 
-Three axes (D20) in the existing INI at `~/.config/llm-snitch/config`,
+Three axes (D20) in the existing INI at `~/.config/llmsnitch/config`,
 parsed with the existing `bridge.load_section` pattern (per-key fallback,
 one malformed value never resets the others). **Every key has a code
 default; the notify layer must work with the `[notify]` sections entirely
@@ -631,9 +631,9 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 ### 3. Daily digest
 
 - New `fs-coil digest` subcommand, run by a new user LaunchAgent
-  `com.slav-it.llm-snitch-digest.plist` (daily at 09:00,
+  `com.slav-it.llmsnitch-digest.plist` (daily at 09:00,
   `StartCalendarInterval`). Full plist — T007 installs this verbatim at
-  `~/Library/LaunchAgents/com.slav-it.llm-snitch-digest.plist` and loads it
+  `~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist` and loads it
   with `launchctl bootstrap gui/$(id -u) <path>`:
 
 ```xml
@@ -641,7 +641,7 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.slav-it.llm-snitch-digest</string>
+  <key>Label</key><string>com.slav-it.llmsnitch-digest</string>
   <key>ProgramArguments</key>
   <array><string>/usr/local/bin/fs-coil</string><string>digest</string></array>
   <key>StartCalendarInterval</key>
@@ -649,7 +649,7 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 </dict></plist>
 ```
 - Reads the *previous day's* ledger file. Always writes
-  `~/Library/Logs/llm-snitch/notify/digest-YYYY-MM-DD.txt` (0600) — the
+  `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt` (0600) — the
   file is unconditional (D18); no config key disables it.
 - Posts one NC banner iff `outlet_digest` is true AND any category's
   day-count ≥ `digest_banner_threshold` (default 20) — threshold-gated
@@ -676,7 +676,7 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 
 Five sequential tickets (D26), rip-and-replace (D24). Each ticket ends with:
 run the full test suite, then install (`sudo cp` the changed files from the
-repo into `/usr/local/share/llm-snitch/fs_coil/` / `/usr/local/bin/`, then
+repo into `/usr/local/share/llmsnitch/fs_coil/` / `/usr/local/bin/`, then
 restart the affected service), then verify its done criteria. Execute in
 order; each ticket leaves the system working.
 
@@ -686,7 +686,7 @@ wrappers need no restart (invoked per-run).
 
 ### T003 — Vendor the fs-coil tree into this repo
 
-- **Create**: `fs_coil/` (verbatim copy of `/usr/local/share/llm-snitch/fs_coil/`,
+- **Create**: `fs_coil/` (verbatim copy of `/usr/local/share/llmsnitch/fs_coil/`,
   minus `__pycache__` at every depth — use `rsync -a --exclude='__pycache__/'`,
   not `cp -R` + a top-level delete), `bin/fs-coil`, `bin/session-shed`,
   `bin/agent-flick` (verbatim from `/usr/local/bin/`, copied with `cp -pL`:
@@ -701,7 +701,7 @@ wrappers need no restart (invoked per-run).
   like `wayfinder/` must stay out). The per-ticket install/restart step is a
   deliberate no-op here: repo and installed files are byte-identical, the
   empty diff is the proof.
-- **Done criteria**: `diff -rq --exclude __pycache__ fs_coil /usr/local/share/llm-snitch/fs_coil`
+- **Done criteria**: `diff -rq --exclude __pycache__ fs_coil /usr/local/share/llmsnitch/fs_coil`
   is empty; same for the three bin scripts;
   `find fs_coil -name __pycache__ -o -name '*.pyc'` is empty;
   `test -x bin/fs-coil -a -x bin/session-shed -a -x bin/agent-flick`;
@@ -763,7 +763,7 @@ wrappers need no restart (invoked per-run).
   startup *log lines* stay — liveness is pull, per the doctrine note in
   Architecture).
 - **Done criteria** (run with `cold_start = 0` in
-  `~/.config/llm-snitch/config`, or a backdated `install_ts` — a fresh
+  `~/.config/llmsnitch/config`, or a backdated `install_ts` — a fresh
   install's learning window otherwise suppresses the banners below):
   `fs-coil light` foreground run (`stdout_only=True` — the `light`
   subcommand): `touch ~/.claude/settings.json` produces a ledger row with
@@ -828,13 +828,13 @@ wrappers need no restart (invoked per-run).
   tests and ad-hoc reruns — `noise` flags, `prune --target`),
   `fs_coil/dashboard.py` (mount the new pane).
 - **Create**: `fs_coil/render_notify.py`,
-  `~/Library/LaunchAgents/com.slav-it.llm-snitch-digest.plist` (install
+  `~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist` (install
   step, not a repo file — document the plist inline in the ticket).
 - **Delete** (the T001 stopgap's remains — a manual live-config edit, the
   one step in this migration outside the repo): **every `suppress_*` key**
   (the stopgap's key shape — `suppress_claude_self` is the one known
   instance, but the deletion keys on the prefix, not the literal) and its
-  comment block from `~/.config/llm-snitch/config`'s `[notify]` section.
+  comment block from `~/.config/llmsnitch/config`'s `[notify]` section.
   Do NOT write any new keys in their place — every `[notify]` key has a
   code default and the layer runs correctly with the section empty or
   absent; the schema in this spec is what a user *may* add.
@@ -846,10 +846,10 @@ wrappers need no restart (invoked per-run).
   `fs-coil status` shows `degraded` when the flag is hand-set in the hot
   state; dashboard renders the pane; `grep -rn "suppress_claude_self\|load_notify_suppress\|match_suppress\|_low_noise\|_should_emit\|_cooldown" fs_coil bin`
   returns nothing (`self._last` is checked as part of `_should_emit`'s
-  removal); `grep -E "^\s*suppress_" ~/.config/llm-snitch/config` returns
+  removal); `grep -E "^\s*suppress_" ~/.config/llmsnitch/config` returns
   nothing (the live-config half of the deletion, prefix-keyed — the repo
   grep cannot see it); `launchctl print
-  gui/$(id -u)/com.slav-it.llm-snitch-digest` exits 0 (the digest agent
+  gui/$(id -u)/com.slav-it.llmsnitch-digest` exits 0 (the digest agent
   actually loaded); full test suite green.
 - **Test strategy**: fixture ledgers for noise/digest; a `--date` override
   on `cmd_digest` for deterministic tests; render function returns strings —

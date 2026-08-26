@@ -51,7 +51,7 @@ def cmd_status():
     _kv("binary",  str(BIN_PATH),    BIN_PATH.exists())
     _kv("daemon",  "loaded" if loaded else "not loaded", loaded)
     _kv("user",    user, user != "(none)")
-    _kv("log dir", f"{home}/Library/Logs/llm-snitch/fs-coil")
+    _kv("log dir", f"{home}/Library/Logs/llmsnitch/fs-coil")
 
 
 def cmd_start():
@@ -105,7 +105,7 @@ def cmd_restart():
 def cmd_logs(follow=False):
     user = console_user() or pwd.getpwuid(os.getuid()).pw_name
     home = user_home(user)
-    log_dir = Path(home) / "Library" / "Logs" / "llm-snitch" / "fs-coil"
+    log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
     today = log_dir / f"fs-coil-{datetime.now():%Y-%m-%d}.log"
     if not today.exists():
         warn(f"no log yet at {today}")
@@ -140,7 +140,7 @@ def cmd_prune(days=30):
         sys.exit(1)
     user = console_user() or pwd.getpwuid(os.getuid()).pw_name
     home = user_home(user)
-    log_dir = Path(home) / "Library" / "Logs" / "llm-snitch" / "fs-coil"
+    log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
     if not log_dir.is_dir():
         warn(f"no log dir at {log_dir}")
         return
@@ -172,7 +172,7 @@ def cmd_noise(category=None, days=1):
     from collections import defaultdict
     user = console_user() or pwd.getpwuid(os.getuid()).pw_name
     home = user_home(user)
-    log_dir = Path(home) / "Library" / "Logs" / "llm-snitch" / "fs-coil"
+    log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
     if not log_dir.is_dir():
         warn(f"no log dir at {log_dir}")
         return
@@ -212,7 +212,7 @@ def cmd_noise(category=None, days=1):
     head(f"suppressed events (last {days} day{'s' if days != 1 else ''})")
     if not by_cat:
         item("nothing suppressed in this window — "
-             "add [notify] suppress_<name> = <glob> to ~/.config/llm-snitch/config")
+             "add [notify] suppress_<name> = <glob> to ~/.config/llmsnitch/config")
         return
     for cat in sorted(by_cat):
         entries = by_cat[cat]

@@ -87,7 +87,7 @@ def cmd_dashboard():
 
     user = console_user() or pwd.getpwuid(os.getuid()).pw_name
     home = user_home(user)
-    log_dir  = Path(home) / "Library" / "Logs" / "llm-snitch" / "fs-coil"
+    log_dir  = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
     log_file = log_dir / f"fs-coil-{datetime.now():%Y-%m-%d}.log"
 
     def _report_loop(sec=None, interval=5):

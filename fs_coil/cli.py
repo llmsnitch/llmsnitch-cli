@@ -35,13 +35,13 @@ Usage:
 
 
 def _light_paths_from_config():
-    """Read `paths` from [light-watch] in ~/.config/llm-snitch/config.
+    """Read `paths` from [light-watch] in ~/.config/llmsnitch/config.
     Falls back to the module default when absent/malformed."""
     from fs_coil.light_watcher import DEFAULT_WATCH_PATHS
     try:
         import configparser
         cp = configparser.ConfigParser(inline_comment_prefixes=("#",))
-        cp.read(os.path.expanduser("~/.config/llm-snitch/config"))
+        cp.read(os.path.expanduser("~/.config/llmsnitch/config"))
         if cp.has_section("light-watch"):
             raw = cp["light-watch"].get("paths", "")
             parts = [p.strip() for p in raw.split(",") if p.strip()]

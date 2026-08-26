@@ -47,9 +47,9 @@ mechanism known) and T202 (patrol subcommand exists) are closed:
    confirm ALL of:
    - a new scan dir exists with `meta.trigger == "patrol"`;
    - `scan_finding` rows for the run are in the notify ledger
-     (`~/Library/Logs/llm-snitch/notify/events-*.ndjson`), at most one
+     (`~/Library/Logs/llmsnitch/notify/events-*.ndjson`), at most one
      banner per territory bucket;
-   - `~/Library/Logs/llm-snitch/patrol.err` exists and is empty (or
+   - `~/Library/Logs/llmsnitch/patrol.err` exists and is empty (or
      explains itself);
    - `llmsnitch scan --report` renders the patrol's findings.
 

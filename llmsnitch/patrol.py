@@ -14,8 +14,7 @@ from pathlib import Path
 
 LABEL = "com.slav-it.llmsnitch-patrol"
 
-# Logs live under the deployed system's hyphenated namespace (llm-snitch),
-# beside the notify ledger — see the drop-dash note on the scan-rollout map.
+# Logs live under the canonical llmsnitch namespace, beside the notify ledger.
 _PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -31,8 +30,8 @@ _PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
   <key>RunAtLoad</key><false/>
-  <key>StandardOutPath</key><string>{home}/Library/Logs/llm-snitch/patrol.out</string>
-  <key>StandardErrorPath</key><string>{home}/Library/Logs/llm-snitch/patrol.err</string>
+  <key>StandardOutPath</key><string>{home}/Library/Logs/llmsnitch/patrol.out</string>
+  <key>StandardErrorPath</key><string>{home}/Library/Logs/llmsnitch/patrol.err</string>
 </dict>
 </plist>
 """
@@ -58,7 +57,7 @@ def run(write, out, plist_path=None):
         if default:
             p.parent.mkdir(parents=True, exist_ok=True)
             (Path(os.path.expanduser("~")) / "Library" / "Logs"
-             / "llm-snitch").mkdir(parents=True, exist_ok=True)
+             / "llmsnitch").mkdir(parents=True, exist_ok=True)
         p.write_text(text)
     except OSError as e:
         out.write(f"[ERROR] cannot write {p}: {e}\n")

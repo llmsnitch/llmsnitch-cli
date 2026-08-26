@@ -31,7 +31,7 @@ from fs_coil.notifier import Notifier
 from fs_coil.runtime import console_user, user_home
 
 
-def load_notify_suppress(config_path="~/.config/llm-snitch/config"):
+def load_notify_suppress(config_path="~/.config/llmsnitch/config"):
     """Read [notify] suppress_* rules from user config.
 
     Each `suppress_<name>` key defines a category whose comma-separated
