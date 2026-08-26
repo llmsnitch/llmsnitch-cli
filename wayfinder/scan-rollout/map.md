@@ -41,6 +41,10 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
   merged as `1dc6dc2`, suites green on main; install is **pipx**
   (`pipx install --force ~/Repos/llmsnitch`), shim at
   `~/.local/bin/llmsnitch`; installed CLI serves the scan MVP.
+- [T202 — `llmsnitch patrol` subcommand + trigger stamp](tickets/T202-patrol-subcommand.md) —
+  built as `742fc15`: plist print/`--write` (idempotent bootstrap),
+  `scan --patrol` stamps `meta.trigger`; on-branch only — T204 carries
+  the second merge.
 
 - Grilling round 1+2 (pre-charting, recorded here since they shaped the map):
   destination = operational rollout (a); track B out of scope; scheduled

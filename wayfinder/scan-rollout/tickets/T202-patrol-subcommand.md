@@ -4,7 +4,17 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T204`
-`status: CLAIMED (2026-08-26, session 99b5a6f6)`
+`status: DONE (2026-08-26)`
+
+## Resolution
+
+Implemented as `742fc15` on the branch: `llmsnitch/patrol.py` (print /
+`--write` + bootout-then-bootstrap), `scan --patrol` → `meta.trigger`,
+CLI wiring, three tests. Suites 33/33 + 8/8 + 18/18; `plutil -lint` OK.
+Review gates run inline over the diff (spec: no deviations; ponytail:
+lean). Note for T204: `--write` is idempotent (bootout first), and the
+plist targets the pipx shim per T201's resolution. NOT yet merged to
+main — T204 step 1 carries the second merge + reinstall.
 
 ## Question
 
