@@ -6,7 +6,7 @@ import sys
 _HERE = os.path.dirname(os.path.realpath(__file__))
 _CANDIDATES = (
     _HERE,                                        # dev: src/fs_coil next to this
-    "/usr/local/share/llm-snitch",               # prod install location
+    "/usr/local/share/llmsnitch",               # prod install location
 )
 for _c in _CANDIDATES:
     if os.path.isdir(os.path.join(_c, "fs_coil")):

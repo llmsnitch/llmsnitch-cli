@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 ##########################################################################################
-## session-shed — session-level auditor for llm-snitch.
+## session-shed — session-level auditor for llmsnitch.
 ##
 ## Thin wrapper around the `agenttrace` binary (https://github.com/luoyuctl/agenttrace,
 ## MIT, pinned v0.7.7). agenttrace parses AI-agent transcripts for cost / tokens /
 ## tool-fail-rate / health; this wrapper's only original job is bridging agenttrace's
-## GATE EXIT CODE into llm-snitch's terminal-notifier channel, edge-triggered.
+## GATE EXIT CODE into llmsnitch's terminal-notifier channel, edge-triggered.
 ##
 ## Everything else is `exec agenttrace`. Runs as the USER, never root.
 ##
@@ -26,7 +26,7 @@ from datetime import datetime
 # Resolve the fs_coil package (for bridge/Notifier/theme reuse) — same
 # candidate search as src/fs-coil.
 _HERE = os.path.dirname(os.path.realpath(__file__))
-for _c in (_HERE, "/usr/local/share/llm-snitch"):
+for _c in (_HERE, "/usr/local/share/llmsnitch"):
     if os.path.isdir(os.path.join(_c, "fs_coil")):
         if _c not in sys.path:
             sys.path.insert(0, _c)
@@ -69,7 +69,7 @@ def _secure_write(path, text, mode="w"):
 
 
 def load_cfg():
-    """Read [session-shed] from ~/.config/llm-snitch/config (INI)."""
+    """Read [session-shed] from ~/.config/llmsnitch/config (INI)."""
     return bridge.load_section(
         "session-shed", _DEFAULTS,
         {"health_floor": int, "max_tool_fail_rate": float},

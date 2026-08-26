@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 ##########################################################################################
-## agent-flick — tool-call/cost observer for llm-snitch.
+## agent-flick — tool-call/cost observer for llmsnitch.
 ##
 ## Thin wrapper around `agent-strace` (https://github.com/Siddhant-K-code/agent-trace,
 ## MIT, PyPI `agent-strace`, pinned 0.83.0, stdlib-only). agent-strace captures the
 ## agent's SEMANTIC layer via Claude Code hooks: tool-call intent, results, latency,
 ## tokens/cost — the layer fs-coil's syscall view can't see. This wrapper's only
-## original job is the cost / tool-fail-rate ALERT BRIDGE into llm-snitch's
+## original job is the cost / tool-fail-rate ALERT BRIDGE into llmsnitch's
 ## terminal-notifier channel, edge-triggered. Everything else is `exec agent-strace`.
 ##
 ## OBSERVATION ONLY: enforcement stays with firewall-constrictor. The upstream `watch`
@@ -41,7 +41,7 @@ os.environ.setdefault("AGENT_STRACE_TELEMETRY", "0")
 # Resolve the fs_coil package (for bridge/Notifier/theme reuse) — same
 # candidate search as src/fs-coil.
 _HERE = os.path.dirname(os.path.realpath(__file__))
-for _c in (_HERE, "/usr/local/share/llm-snitch"):
+for _c in (_HERE, "/usr/local/share/llmsnitch"):
     if os.path.isdir(os.path.join(_c, "fs_coil")):
         if _c not in sys.path:
             sys.path.insert(0, _c)
@@ -80,7 +80,7 @@ def _state_dir():
 
 
 def load_cfg():
-    """Read [agent-flick] from ~/.config/llm-snitch/config (INI)."""
+    """Read [agent-flick] from ~/.config/llmsnitch/config (INI)."""
     return bridge.load_section(
         "agent-flick", _DEFAULTS,
         {"cost_ceiling": float, "max_tool_fail_rate": float},
@@ -158,7 +158,7 @@ def cmd_check(cfg):
         return EXIT_OPERATIONAL
 
     # AGGREGATES ONLY — session id / counts / dollars. Never meta['command'],
-    # never event bodies: prompts and tool args must not enter llm-snitch logs.
+    # never event bodies: prompts and tool args must not enter llmsnitch logs.
     breaches = []
     for m in metas:
         sid = str(m.get("session_id") or "?")

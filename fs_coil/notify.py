@@ -82,20 +82,20 @@ def _home():
 def _notify_dir():
     return os.environ.get(
         "LLMSNITCH_NOTIFY_DIR",
-        os.path.join(_home(), "Library", "Logs", "llm-snitch", "notify"))
+        os.path.join(_home(), "Library", "Logs", "llmsnitch", "notify"))
 
 
 def _hot_state_path():
     return os.environ.get(
         "LLMSNITCH_HOT_STATE",
-        os.path.join(_home(), "Library", "Caches", "llm-snitch",
+        os.path.join(_home(), "Library", "Caches", "llmsnitch",
                      "notify-state.json"))
 
 
 def _read_ini():
     """{section: {key: raw}} — whole-file read, per-key fallback at use."""
     path = os.environ.get("LLMSNITCH_CONFIG",
-                          os.path.expanduser("~/.config/llm-snitch/config"))
+                          os.path.expanduser("~/.config/llmsnitch/config"))
     cp = configparser.ConfigParser(inline_comment_prefixes=("#",))
     try:
         if os.path.exists(path):

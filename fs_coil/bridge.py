@@ -18,7 +18,7 @@ from fs_coil.runtime import console_user, user_home
 # (Wrapped binaries may use other codes — the wrapper maps to these.)
 EXIT_PASS, EXIT_BREACH, EXIT_OPERATIONAL = 0, 1, 2
 
-_CONFIG_PATH = "~/.config/llm-snitch/config"
+_CONFIG_PATH = "~/.config/llmsnitch/config"
 
 
 def resolve_bin(candidates):
@@ -27,10 +27,10 @@ def resolve_bin(candidates):
 
 
 def state_dir(tool):
-    """~/Library/Logs/llm-snitch/<tool>/, created 0700, owned by the console
+    """~/Library/Logs/llmsnitch/<tool>/, created 0700, owned by the console
     user's home. `tool` is the subdir name, e.g. 'session-shed'."""
     home = user_home(console_user() or "") if console_user() else os.path.expanduser("~")
-    d = Path(home) / "Library" / "Logs" / "llm-snitch" / tool
+    d = Path(home) / "Library" / "Logs" / "llmsnitch" / tool
     d.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(d, 0o700)
@@ -50,7 +50,7 @@ def secure_write(path, text, mode="w"):
 
 
 def load_section(section, defaults, casters=None):
-    """Read [section] from the llm-snitch INI config with per-key fallback.
+    """Read [section] from the llmsnitch INI config with per-key fallback.
 
     defaults: dict of key -> default value (defines which keys are read).
     casters:  dict of key -> callable (int/float/…); keys absent from casters

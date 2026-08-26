@@ -5,7 +5,7 @@ terminal-notifier path."""
 import os
 from pathlib import Path
 
-PLIST_LABEL = "com.slav-it.llm-snitch"
+PLIST_LABEL = "com.slav-it.llmsnitch"
 PLIST_PATH = Path(f"/Library/LaunchDaemons/{PLIST_LABEL}.plist")
 BIN_PATH = Path("/usr/local/bin/fs-coil")
 ESLOGGER = "/usr/bin/eslogger"
@@ -62,7 +62,7 @@ NOISE_PATH_SUBSTRINGS = (
     "/.pnpm-store/", "/.yarn/cache/", "/.bun/install/cache/",
     "/Library/Caches/", "/Library/Logs/",
     "/.git/objects/", "/.git/logs/", "/.git/refs/", "/.git/pack/",
-    "/Library/Logs/llm-snitch/", "/Library/Caches/llm-snitch/",                       # avoid feedback loop
+    "/Library/Logs/llmsnitch/", "/Library/Caches/llmsnitch/",                       # avoid feedback loop
     "/.Trash/",                            # separate concern
 )
 

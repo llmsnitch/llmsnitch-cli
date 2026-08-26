@@ -57,8 +57,8 @@ def _render_posture(d):
             ("log dir",    _shrink(str(d["log_dir"]),  d["home"]),        d["log_dir"].is_dir()),
             ("icon cache", f"{_shrink(str(d['icon_dir']), d['home'])} ({d['icon_count']})",
                                                                           d["icon_dir"].is_dir()),
-            ("config",     _shrink(f"{d['home']}/.config/llm-snitch/config", d["home"]),
-                           Path(f"{d['home']}/.config/llm-snitch/config").exists()),
+            ("config",     _shrink(f"{d['home']}/.config/llmsnitch/config", d["home"]),
+                           Path(f"{d['home']}/.config/llmsnitch/config").exists()),
         ]),
         _block("activity (7d)", [
             ("matches", f"{d['h1']} (1h) · {d['d1']} (24h) · {d['d7']} (7d)",

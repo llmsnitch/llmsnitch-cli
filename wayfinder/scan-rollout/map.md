@@ -67,7 +67,7 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
   subcommand (print / `--write`, no inside-CC guard needed — the plist does
   not wire the monitored agent's own hooks); ledger stamps
   `meta.trigger = patrol|manual`; plist logs to
-  `~/Library/Logs/llm-snitch/patrol.err`; staleness detection deferred to
+  `~/Library/Logs/llmsnitch/patrol.err`; staleness detection deferred to
   fog.
 
 ## Not yet specified
@@ -87,8 +87,8 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
   future effort (PORT_INDEX rank-2 keeps the pointer).
 - **Digest recall of scan findings** — consequence of track B being out of
   scope: NC banners + `scan --report` are the outlets until T007 exists.
-- **`llm-snitch` → `llmsnitch` namespace rename** — a full migration handoff
+- **`llmsnitch` → `llmsnitch` namespace rename** — a full migration handoff
   exists (scratchpad `handoff-drop-dash.md`, session
   `99b5a6f6-d9b4-4b7d-9218-413cca01f7bb`); recommended sequencing is AFTER
   track B. T202/T204 deliberately use the hyphenated live paths
-  (`~/Library/Logs/llm-snitch/`) — the rename effort migrates them.
+  (`~/Library/Logs/llmsnitch/`) — the rename effort migrates them.

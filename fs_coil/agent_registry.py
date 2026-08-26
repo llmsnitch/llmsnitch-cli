@@ -4,7 +4,7 @@ Built-in table of known coding agents + `[agent.<name>]` config merge,
 `attribute_actor()` (D14–D16) and `classify_event()` (D06, D07).
 
 Stdlib only. Config path honors the LLMSNITCH_CONFIG test seam, defaulting
-to the shared llm-snitch INI.
+to the shared llmsnitch INI.
 """
 
 import configparser
@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 
-_CONFIG_PATH = "~/.config/llm-snitch/config"
+_CONFIG_PATH = "~/.config/llmsnitch/config"
 _NAME_RE = re.compile(r"^[a-z0-9_-]+$")
 
 # Built-in registry (D17). signing_ids ship empty for non-Claude agents —

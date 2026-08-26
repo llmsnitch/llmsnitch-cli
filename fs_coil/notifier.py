@@ -35,8 +35,8 @@ class Notifier:
                 pass
 
         home = user_home(self._user) if self._user else ""
-        self._icon_dir = Path(home) / "Library" / "Caches" / "llm-snitch" / "fs-coil" / "icons" if home else None
-        self._icon_override_dir = Path(home) / ".config" / "llm-snitch" / "icons" if home else None
+        self._icon_dir = Path(home) / "Library" / "Caches" / "llmsnitch" / "fs-coil" / "icons" if home else None
+        self._icon_override_dir = Path(home) / ".config" / "llmsnitch" / "icons" if home else None
         self._extra_app_roots = [str(Path(home) / "Applications")] if home else []
         self._icon_cache = {}   # key → str path or None
         if self._icon_dir is not None:
@@ -63,7 +63,7 @@ class Notifier:
         if key in self._icon_cache:
             return self._icon_cache[key]
 
-        # 1. User override (png or icns) in ~/.config/llm-snitch/icons/
+        # 1. User override (png or icns) in ~/.config/llmsnitch/icons/
         if self._icon_override_dir is not None:
             for ext in (".png", ".icns"):
                 o = self._icon_override_dir / f"{key}{ext}"
