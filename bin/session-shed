@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+##########################################################################################
+## session-shed — session-level auditor for llm-snitch.
+##
+## Thin wrapper around the `agenttrace` binary (https://github.com/luoyuctl/agenttrace,
+## MIT, pinned v0.7.7). agenttrace parses AI-agent transcripts for cost / tokens /
+## tool-fail-rate / health; this wrapper's only original job is bridging agenttrace's
+## GATE EXIT CODE into llm-snitch's terminal-notifier channel, edge-triggered.
+##
+## Everything else is `exec agenttrace`. Runs as the USER, never root.
+##
+## Usage:
+##   session-shed                overview report (exec agenttrace --overview)
+##   session-shed check          run health gate; alert on healthy->breach transition
+##                                  exit 0 pass / 1 breach / 2 operational-error
+##   session-shed alerts         tail the gate-alert log
+##   session-shed <args...>      passthrough to agenttrace (e.g. --doctor, --latest)
+##########################################################################################
+
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+
+# Resolve the fs_coil package (for bridge/Notifier/theme reuse) — same
+# candidate search as src/fs-coil.
+_HERE = os.path.dirname(os.path.realpath(__file__))
+for _c in (_HERE, "/usr/local/share/llm-snitch"):
+    if os.path.isdir(os.path.join(_c, "fs_coil")):
+        if _c not in sys.path:
+            sys.path.insert(0, _c)
+        break
+
+from fs_coil import bridge                        # noqa: E402
+from fs_coil.notifier import Notifier             # noqa: E402
+from fs_coil.theme import err, warn               # noqa: E402
+
+# Pinned upstream — see plans/agenttrace-integration.md.
+PINNED_VERSION = "v0.7.7"
+
+# Binary resolution — None when not installed.
+AGENTTRACE_BIN = bridge.resolve_bin([
+    __import__("shutil").which("agenttrace"),
+    os.path.expanduser("~/.cargo/bin/agenttrace"),
+    "/opt/homebrew/bin/agenttrace",
+    "/usr/local/bin/agenttrace",
+])
+
+# check_interval lives in the LaunchAgent plist (StartInterval), not here.
+_DEFAULTS = {
+    "health_floor": 80,
+    "max_tool_fail_rate": 15.0,
+    "range": "latest",
+}
+
+# Normalized exit codes (agenttrace's own are inverted: 2=breach, 1=error).
+EXIT_PASS, EXIT_BREACH, EXIT_OPERATIONAL = (
+    bridge.EXIT_PASS, bridge.EXIT_BREACH, bridge.EXIT_OPERATIONAL)
+_AGENTTRACE_BREACH_RC = 2   # std::process::exit(2) in agenttrace main.rs:414
+
+# Thin module-level adapters over bridge (kept so the test surface is stable).
+def _state_dir():
+    return bridge.state_dir("session-shed")
+
+
+def _secure_write(path, text, mode="w"):
+    return bridge.secure_write(path, text, mode)
+
+
+def load_cfg():
+    """Read [session-shed] from ~/.config/llm-snitch/config (INI)."""
+    return bridge.load_section(
+        "session-shed", _DEFAULTS,
+        {"health_floor": int, "max_tool_fail_rate": float},
+    )
+
+
+def _require_bin():
+    if AGENTTRACE_BIN is None:
+        err("agenttrace not installed — run ./install.sh or see "
+            "https://github.com/luoyuctl/agenttrace/releases/tag/" + PINNED_VERSION)
+        return False
+    return True
+
+
+def _alert_message(payload):
+    """Build a human alert from agenttrace overview JSON — AGGREGATES ONLY,
+    never prompt/code bodies. Every field defensive (schema may drift)."""
+    summ = payload.get("summary", {}) if isinstance(payload, dict) else {}
+    parts = [
+        f"avg health {summ.get('avg_health', 'n/a')}",
+        f"critical {summ.get('critical', 'n/a')}",
+        f"tool-fail {summ.get('tool_fail_rate', 'n/a')}%",
+        f"cost ${summ.get('total_cost', 'n/a')}",
+    ]
+    recent = payload.get("recent_sessions") if isinstance(payload, dict) else None
+    if isinstance(recent, list) and recent:
+        worst = min(recent, key=lambda r: r.get("health", 999) if isinstance(r, dict) else 999)
+        if isinstance(worst, dict):
+            parts.append(f"worst: {worst.get('name', '?')} "
+                         f"({worst.get('source_tool', '?')}) health={worst.get('health', 'n/a')}")
+    return " · ".join(parts)
+
+
+def cmd_check(cfg):
+    if not _require_bin():
+        return EXIT_OPERATIONAL
+    argv = [
+        AGENTTRACE_BIN, "--overview", "-f", "json",
+        "--range", cfg["range"],
+        "--fail-under-health", str(cfg["health_floor"]),
+        "--fail-on-critical",
+        "--max-tool-fail-rate", str(cfg["max_tool_fail_rate"]),
+    ]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        err(f"agenttrace failed to run: {type(e).__name__}: {e}")
+        return EXIT_OPERATIONAL
+
+    rc = proc.returncode
+    if rc not in (EXIT_PASS, _AGENTTRACE_BREACH_RC):
+        # agenttrace internal error (exit 1) or unexpected code.
+        err(f"agenttrace exited {rc}: {(proc.stderr or '').strip()[:200]}")
+        return EXIT_OPERATIONAL
+
+    verdict = "pass" if rc == EXIT_PASS else "breach"
+
+    # agenttrace writes the report to stdout regardless of gate outcome.
+    try:
+        payload = json.loads(proc.stdout) if proc.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+
+    # Edge-trigger: alert only on a transition (logic lives in bridge).
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log = _state_dir() / "alerts.log"
+
+    def _on_breach():
+        msg = _alert_message(payload)
+        _secure_write(log, f"[{ts}] BREACH {msg}\n", mode="a")
+        Notifier().notify(
+            title="🦍 session-shed: health gate breached",
+            message=msg,
+            key=("session-shed", "gate", "breach"),
+        )
+
+    def _on_recover():
+        _secure_write(log, f"[{ts}] RECOVERED gate healthy again\n", mode="a")
+
+    bridge.edge_alert(_state_dir() / "state.json", verdict, _on_breach, _on_recover)
+    return EXIT_PASS if verdict == "pass" else EXIT_BREACH
+
+
+def cmd_alerts():
+    log = _state_dir() / "alerts.log"
+    if not log.exists():
+        warn(f"no alerts yet at {log}")
+        return
+    try:
+        subprocess.run(["/usr/bin/tail", "-n", "200", str(log)])
+    except (KeyboardInterrupt, OSError):
+        pass
+
+
+def main():
+    argv = sys.argv[1:]
+    cmd = argv[0] if argv else ""
+
+    if cmd == "check":
+        sys.exit(cmd_check(load_cfg()))
+    if cmd == "alerts":
+        cmd_alerts()
+        return
+    if not _require_bin():
+        sys.exit(EXIT_OPERATIONAL)
+    # Default: overview. Any other args: raw passthrough to agenttrace.
+    passthrough = argv if argv else ["--overview"]
+    os.execv(AGENTTRACE_BIN, [AGENTTRACE_BIN] + passthrough)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(130)
