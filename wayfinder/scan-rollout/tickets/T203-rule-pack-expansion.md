@@ -4,7 +4,32 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: —`
-`status: CLAIMED (2026-08-26, session 99b5a6f6)`
+`status: DONE (2026-08-26)`
+
+## Resolution
+
+Shipped as `2da768b`. Both rules read from upstream source before writing
+(`pkg/rules/dns_exfil.go`, `pkg/rules/hooks.go`) and reimplemented in the
+house regex idiom.
+
+Two deviations from this ticket's sketch, both siding with upstream over
+the sketch:
+1. **SD-020 scope**: `claude_settings` only, not `hook_script` — upstream
+   gates on `IsClaudeSettings`; unquoted `$VAR` in shell scripts is normal
+   shell and would flood.
+2. **SD-020 category**: `scan_hygiene`/low, not `config_compromise` — the
+   page's Decision is "quote the variable", which is hygiene by the
+   AGENTS.md gate. Bump it if injection-in-hooks ever proves exploitable
+   here.
+
+SD-022 landed per ticket (conjunction rule, `config_compromise`, classes
+`hook_script`/`skill_script`; upstream severity HIGH noted in comment).
+
+Verification: 34/34 + 8/8 + 18/18; ReDoS payloads extended (dig-repeat,
+long command-string) and green; real-machine smoke — DNS rule silent,
+`hook_unquoted_var` 9 hits on Supacode-installed hooks (unquoted
+`$__ppid` shapes), true by upstream semantics, all low/record_only. No
+exemption added; the severity is the damper.
 
 ## Question
 
