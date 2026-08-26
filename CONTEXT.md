@@ -82,3 +82,59 @@ _Avoid_: agent list, whitelist
 The three tests from `AGENTS.md` every page must pass: Decision, Actor,
 Novelty.
 _Avoid_: notification rules
+
+**Harness**:
+An AI coding agent product whose activity llmsnitch traces (Claude Code,
+Codex CLI, Cursor, …). The thing an adapter supports.
+_Avoid_: agent (ambiguous with registry actors), tool
+
+**Harness adapter**:
+The per-harness declarative entry plus optional code hook that ledger-ingests
+a harness's sessions into the store — coupled with that harness's
+agent-registry entry (contract: `docs/harness-adapter-contract.md`).
+_Avoid_: plugin, integration, connector
+
+**Ledger**:
+The session/trace files a harness already writes on its own; ledger
+ingestion parses them after the fact — the universal capture mode, requiring
+no hook install and leaving the harness unmodified.
+_Avoid_: transcript sweep, log scraping
+
+**Signal set**:
+The closed per-session list every adapter must produce: model ids, token
+counts per model, session start/end, cwd/project, error count. Anything
+beyond it is optional enrichment.
+_Avoid_: metrics, telemetry
+
+**Ingest cursor**:
+Per-source-file incremental state (path, mtime, size, offset or hash) in
+`ingest-state.json` that keeps ledger sweeps cheap and idempotent.
+_Avoid_: checkpoint, watermark
+
+**Provenance**:
+The `src` fields on a ledger-derived row — source file path, SHA-256,
+mtime — pointing back at the original the row was normalized from.
+_Avoid_: origin, source ref
+
+**Deferred (tier)**:
+Support state for a harness whose local traces exist but are not
+stdlib-readable yet (e.g. zstd before Python 3.14); admission still passes,
+only ingestion waits.
+_Avoid_: unsupported, blocked
+
+**Dossier**:
+The single per-harness fact sheet (trace locations, config paths, hook
+system, pricing source, exes/signing ids, admission verdict) that feeds the
+adapter, the registry entry, and later the scan seed table.
+_Avoid_: profile, spec, survey
+
+**Roster**:
+The ordered list of harnesses queued for support: union of Ori's and the
+OpenRouter cookbook's lists, popularity-ranked, admission-tested.
+_Avoid_: backlog, matrix
+
+**Admission test**:
+The roster gate: a harness is adapter-eligible iff it writes local
+trace/session files on disk; cloud-only harnesses fall to the companion
+browser extension.
+_Avoid_: eligibility check, filter

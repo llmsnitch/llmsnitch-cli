@@ -1,0 +1,14 @@
+{"timestamp":"2026-08-20T10:00:00.000Z","type":"session_meta","payload":{"id":"0199aaaa-bbbb-7ccc-8ddd-eeeeffff0001","cwd":"/tmp/proj","model_provider":"openai","base_instructions":{"text":"BODYCLASS instructions MUSTNOTCOPY"}}}
+{"timestamp":"2026-08-20T10:00:01.000Z","type":"session_meta","payload":{"id":"0199aaaa-bbbb-7ccc-8ddd-eeeeffff9999","cwd":"/tmp/parent"}}
+{"timestamp":"2026-08-20T10:00:02.000Z","type":"turn_context","payload":{"model":"gpt-5.5","cwd":"/tmp/proj"}}
+{"timestamp":"2026-08-20T10:00:30.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":180},"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":180}}}}
+{"timestamp":"2026-08-20T10:00:35.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":180},"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":180}}}}
+{"timestamp":"2026-08-20T10:00:36.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":40,"cached_input_tokens":0,"output_tokens":30,"reasoning_output_tokens":0,"total_tokens":70},"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":180}}}}
+{"timestamp":"2026-08-20T10:00:40.000Z","type":"event_msg","payload":{"type":"agent_message","message":"assistant prose MUSTNOTCOPY"}}
+{"timestamp":"2026-08-20T10:00:41.000Z","type":"response_item","payload":{"type":"function_call_output","output":"tool output containing sk-test1234567890abcdef secret"}}
+{"timestamp":"2026-08-20T10:01:00.000Z","type":"event_msg","payload":{"type":"mcp_tool_call_end","result":{"Ok":{"isError":true}}}}
+{"timestamp":"2026-08-20T10:02:00.000Z","type":"event_msg","payload":{"type":"patch_apply_end","success":false,"changes":{"/home/user/secret-project/file.py":{"content":"BODYCLASS patch MUSTNOTCOPY"}}}}
+{"timestamp":"2026-08-20T10:03:00.000Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}
+{"timestamp":"2026-08-20T10:04:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":40,"cached_input_tokens":0,"output_tokens":30,"reasoning_output_tokens":0,"total_tokens":70},"total_token_usage":{"input_tokens":140,"cached_input_tokens":20,"output_tokens":80,"reasoning_output_tokens":10,"total_tokens":250}}}}
+{"timestamp":"2026-08-20T10:04:30.000Z","type":"turn_context","payload":{"model":"azureml://registries/azure-openai/models/gpt-5.3-codex/versions/2026-02-24"}}
+{"timestamp":"2026-08-20T10:05:00.000Z","type":"event_msg","payload":{"type":"token_count","info":null}}
