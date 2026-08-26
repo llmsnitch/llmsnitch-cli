@@ -134,7 +134,7 @@ def test_drift_is_never_record_only():
         scan.cmd_scan([str(root)], io.StringIO())
         drift = [r for r in _rows(t)
                  if r["category"] == "scan_finding"
-                 and r["subject"].startswith("high drift_changed")]
+                 and r["subject"].startswith("drift_changed")]
         assert drift, "drift_changed never reached the notify ledger"
         assert not any(r.get("record_only") for r in drift), drift
     _with_tmp(body)
@@ -158,6 +158,10 @@ def test_report_renders_stored_scan_without_mutation():
             assert "drift_changed" in buf.getvalue(), buf.getvalue()
             assert "wildcard_bash_grant" in buf.getvalue()
         assert buf1.getvalue() == buf2.getvalue(), "report not idempotent"
+        text = buf1.getvalue()
+        assert "known" in text, "persisting finding not marked known"
+        assert text.index("[CRITICAL]") < text.index("findings:"), \
+            "counts should close the block, not open it"
         assert (t / "store" / "baseline.json").read_bytes() == baseline, \
             "--report mutated the baseline"
         assert len(list((t / "store" / "scans").iterdir())) == 2, \
@@ -170,6 +174,24 @@ def test_report_without_scans_is_operational_error():
         buf = io.StringIO()
         assert scan.cmd_scan(["--report"], buf) == 2
         assert "no stored scans" in buf.getvalue()
+        assert scan.cmd_scan(["--report", str(t)], io.StringIO()) == 2
+        assert scan.cmd_scan(["--report", "--rebaseline"], io.StringIO()) == 2
+    _with_tmp(body)
+
+
+def test_report_falls_back_over_corrupt_newest_scan():
+    """A corrupt newest scan dir must not make --report claim no scans
+    exist — it falls back to the previous readable scan."""
+    def body(t, delivered, errors):
+        root = t / "proj"
+        _seed(root)
+        scan.cmd_scan([str(root)], io.StringIO())
+        scan.cmd_scan([str(root)], io.StringIO())
+        newest = sorted((t / "store" / "scans").iterdir())[-1]
+        (newest / "meta.json").write_text("{corrupt")
+        buf = io.StringIO()
+        assert scan.cmd_scan(["--report"], buf) == 1
+        assert "wildcard_bash_grant" in buf.getvalue()
     _with_tmp(body)
 
 
@@ -195,6 +217,9 @@ def test_notify_unavailable_is_visible():
             (t / "store" / "scans").iterdir()).joinpath("meta.json")
             .read_text())
         assert meta["notify_routed"] is False
+        rep = io.StringIO()   # the stored report carries the warning too
+        assert scan.cmd_scan(["--report"], rep) == 1
+        assert "notify layer unavailable" in rep.getvalue()
     _with_tmp(body)
 
 

@@ -405,7 +405,9 @@ def _route_to_notifier(findings):
         if f.get("resolved"):
             continue
         sev = f["severity"]
-        label = f"{sev} " if sev in ("critical", "high") else ""
+        # Only `critical` is load-bearing in the subject — `high` equals the
+        # derived alert tier and would be redundant next to it.
+        label = "critical " if sev == "critical" else ""
         fs_notify.notify(   # never raises (fail-closed by contract)
             "config-audit", "scan_finding",
             f"{label}{f['rule_id']}: {f['artifact']}",
@@ -428,15 +430,16 @@ def to_text(meta, findings):
     if not real:
         lines.append("[OK] no findings")
     else:
-        lines.append("findings: " + ", ".join(
-            f"{k}={sev[k]}" for k in
-            sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))))
+        # Criticals first, then highs/mediums; counts close the block.
         for f in sorted(real, key=lambda f:
                         -_SEVERITY_RANK.get(f["severity"], 0)):
             if _SEVERITY_RANK.get(f["severity"], 0) >= 2:
-                mark = "NEW " if f.get("new") else ""
-                lines.append(f"[{f['severity'].upper()}] {mark}{f['rule_id']} "
+                mark = "NEW" if f.get("new") else "known"
+                lines.append(f"[{f['severity'].upper()}] {mark} {f['rule_id']} "
                              f"{f['artifact']}:{f['line']}  {f['evidence']}")
+        lines.append("findings: " + ", ".join(
+            f"{k}={sev[k]}" for k in
+            sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))))
     resolved = sum(1 for f in findings if f.get("resolved"))
     if resolved:
         lines.append(f"resolved since last scan: {resolved}")
@@ -489,29 +492,32 @@ def to_sarif(meta, findings):
 # -- CLI ---------------------------------------------------------------------
 
 def _load_latest_scan():
-    """(meta, findings) of the newest stored scan, or None. Read-only —
-    tolerates a truncated findings tail like every other reader."""
+    """(meta, findings) of the newest readable stored scan, or None.
+    Read-only — tolerates a truncated findings tail like every other
+    reader, and falls back past a corrupt/partial newest dir rather than
+    claiming no scans exist."""
     scans = store.base_dir() / "scans"
     try:
-        d = max((p for p in scans.iterdir() if p.is_dir()), default=None)
+        dirs = sorted((p for p in scans.iterdir() if p.is_dir()),
+                      reverse=True)
     except OSError:
         return None
-    if d is None:
-        return None
-    try:
-        meta = json.loads((d / "meta.json").read_text())
-        raw = (d / "findings.ndjson").read_text()
-    except (OSError, json.JSONDecodeError):
-        return None
-    findings = []
-    for line in raw.splitlines():
+    for d in dirs:
         try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
+            meta = json.loads((d / "meta.json").read_text())
+            raw = (d / "findings.ndjson").read_text()
+        except (OSError, json.JSONDecodeError):
             continue
-        if isinstance(row, dict):
-            findings.append(row)
-    return meta, findings
+        findings = []
+        for line in raw.splitlines():
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict):
+                findings.append(row)
+        return meta, findings
+    return None
 
 
 def cmd_scan(argv, out):
@@ -555,6 +561,10 @@ def cmd_scan(argv, out):
         return 0
 
     if report:
+        if roots or rebaseline:
+            out.write("[ERROR] --report reads the stored scan — "
+                      "drop ROOT/--rebaseline\n")
+            return 2
         loaded = _load_latest_scan()
         if loaded is None:
             out.write("[ERROR] no stored scans — run `llmsnitch scan` first\n")
