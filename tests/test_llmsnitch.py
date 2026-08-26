@@ -193,6 +193,45 @@ def test_scan_skill_manifest_rules():
     _with_tmp_store(body)
 
 
+def test_scan_patrol_trigger_stamp():
+    """--patrol stamps meta.trigger = patrol; a plain run stamps manual."""
+    from llmsnitch import scan
+    def body(t):
+        cdir = t / "proj" / ".claude"
+        cdir.mkdir(parents=True)
+        (cdir / "settings.json").write_text('{"model": "opus"}')
+        scan.cmd_scan([str(t / "proj"), "--patrol"], io.StringIO())
+        scan.cmd_scan([str(t / "proj")], io.StringIO())
+        metas = [json.loads((d / "meta.json").read_text())
+                 for d in sorted((t / "scans").iterdir())]
+        assert [m["trigger"] for m in metas] == ["patrol", "manual"], metas
+    _with_tmp_store(body)
+
+
+def test_patrol_plist_print_write_and_refusal():
+    """patrol prints a lint-clean plist; --write to a seam path writes the
+    same bytes and skips launchctl; an unwritable target exits 2."""
+    import shutil
+    import subprocess
+    from llmsnitch import patrol
+    buf = io.StringIO()
+    assert patrol.run(False, buf) == 0
+    text = buf.getvalue()
+    for needle in (patrol.LABEL, "--patrol", "patrol.err",
+                   "StartCalendarInterval"):
+        assert needle in text, needle
+    if shutil.which("plutil"):
+        r = subprocess.run(["plutil", "-lint", "-"], input=text.encode(),
+                           capture_output=True)
+        assert r.returncode == 0, r.stdout + r.stderr
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "x.plist"
+        assert patrol.run(True, io.StringIO(), plist_path=str(p)) == 0
+        assert p.read_text() == text
+    assert patrol.run(True, io.StringIO(),
+                      plist_path="/dev/null/nope/x.plist") == 2
+
+
 def test_scan_frontmatter_beyond_60_lines_still_checked():
     """A long frontmatter block must not evade the undeclared-bash rule."""
     from llmsnitch import scan

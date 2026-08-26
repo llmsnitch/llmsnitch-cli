@@ -331,7 +331,7 @@ def _previous_fingerprints():
 
 # -- the scan ----------------------------------------------------------------
 
-def run_scan(roots=None, rebaseline=False):
+def run_scan(roots=None, rebaseline=False, trigger="manual"):
     scan_id = "scan-" + time.strftime("%Y%m%d-%H%M%S")
     d = store.base_dir() / "scans" / scan_id
     n = 1
@@ -373,7 +373,7 @@ def run_scan(roots=None, rebaseline=False):
     meta = {"scan_id": scan_id, "started_at": started, "ended_at": store.now(),
             "roots": [str(r) for r in (roots or [])] or ["<territories+cwd>"],
             "files_scanned": files_scanned, "files_skipped": skipped,
-            "findings_by_severity": by_sev,
+            "findings_by_severity": by_sev, "trigger": trigger,
             "ruleset_sha256": scanrules.ruleset_sha256()}
 
     store._mkdir_private(d)
@@ -522,7 +522,7 @@ def _load_latest_scan():
 
 def cmd_scan(argv, out):
     fmt, fail_on, roots, out_file = "text", "high", [], None
-    inventory = rebaseline = report = False
+    inventory = rebaseline = report = patrol_run = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -538,6 +538,8 @@ def cmd_scan(argv, out):
             rebaseline = True; i += 1
         elif a == "--report":
             report = True; i += 1
+        elif a == "--patrol":
+            patrol_run = True; i += 1
         elif a.startswith("--"):
             out.write(f"[ERROR] unknown flag: {a}\n")
             return 2
@@ -571,7 +573,8 @@ def cmd_scan(argv, out):
             return 2
         meta, findings = loaded
     else:
-        meta, findings = run_scan(roots or None, rebaseline)
+        meta, findings = run_scan(roots or None, rebaseline,
+                                  "patrol" if patrol_run else "manual")
     text = {"text": to_text, "json": to_json, "sarif": to_sarif}[fmt](
         meta, findings)
     if out_file:
