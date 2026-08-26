@@ -452,14 +452,9 @@ def to_json(meta, findings):
 
 def to_sarif(meta, findings):
     """SARIF 2.1.0 — modeled on Cisco sarif_reporter.py (survey §2.4)."""
-    seen_rules, rules = set(), []
-    for rid, cat, sev, _, _ in scanrules.RULES:
-        if rid not in seen_rules:
-            seen_rules.add(rid)
-            rules.append({"id": rid,
-                          "shortDescription": {"text": f"{cat}: {rid}"},
-                          "defaultConfiguration": {
-                              "level": _SARIF_LEVEL[sev]}})
+    rules = [{"id": rid, "shortDescription": {"text": f"{cat}: {rid}"},
+              "defaultConfiguration": {"level": _SARIF_LEVEL[sev]}}
+             for rid, cat, sev, _, _ in scanrules.RULES]
     for rid in ("secret_shape", "skill_undeclared_bash", "drift_added",
                 "drift_changed", "drift_removed"):
         rules.append({"id": rid, "shortDescription": {"text": rid},
