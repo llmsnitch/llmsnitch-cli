@@ -83,6 +83,7 @@ In scope — all llmsnitch alert surfaces (D02):
 | `fs-coil-deep` | eslogger watcher (reads + writes + execs, needs FDA) | root LaunchDaemon `com.slav-it.llm-snitch` |
 | `session-shed` | agenttrace health-gate wrapper | user, periodic |
 | `agent-flick` | agent-strace cost-gate wrapper | user, periodic |
+| `config-audit` | `llmsnitch scan` — cold-path config audit over agent artifacts | user, on demand |
 | *(future)* | any new watcher (e.g. proc-eye) calls the same API | — |
 
 Config groups `fs-coil-light` and `fs-coil-deep` under one policy section
@@ -252,6 +253,7 @@ config (D05): config selects and tunes, it never invents categories.
 | `deny_read` | Deep mode: read of a watched path by an unrecognized actor | 5m | high | investigate; rotate the credential if unexpected |
 | `keychain_access` | Deep mode: `security find-generic-password` etc. by a watched process (except when `agent_signed_self_read` matches — predicate `is_signed_self_read(pinfo, path)`, which lives in `fs_coil/agent_registry.py`; `monitor.py` calls it and passes the resulting category) | 5m | high | check which item was read; rotate if unexpected |
 | `threshold_breach` | session-shed / agent-flick verdict transition | edge-triggered (0) | high | review the session (`session-shed`, `agent-flick` report); kill the runaway session |
+| `scan_finding` | `llmsnitch scan` finding routed by the config-audit surface. **Quiet by design**: the notify tier is capped at `high` and never pierces cold start — the finding's own severity travels in the subject (`critical <rule_id>: <path>`) and, fully, in the scan's own ledger; `scan --report` is the loud, complete view. info/low findings are `record_only` (no decision) except `drift_*`, which always names one (rebaseline or revert). | 24h | high | review the findings: `llmsnitch scan --report` |
 
 Windows are expressed as duration strings: integer + `s`/`m`/`h`/`d`.
 Parser lives in `notify.py` (`parse_window("24h") → 86400`). The meaning of
@@ -525,8 +527,9 @@ what a user *may* write.
 | `fs-coil-light`, `fs-coil-deep` | `[notify.fs-coil]` |
 | `session-shed` | `[notify.session-shed]` |
 | `agent-flick` | `[notify.agent-flick]` |
+| `config-audit` | `[notify.config-audit]` |
 
-Only these three section names are consulted; anything else under
+Only these four section names are consulted; anything else under
 `[notify.*]` is ignored (so a stray `[notify.fs-coil-light]` has no
 effect). `enabled = false` in a surface section stops that surface's
 *paging* only — its events still ledger; `[notify] enabled = false` does

@@ -2,7 +2,11 @@
 
   llmsnitch scan [ROOT ...] [--format text|json|sarif]
                  [--fail-on critical|high|medium] [--inventory]
-                 [--rebaseline] [--out FILE]
+                 [--rebaseline] [--report] [--out FILE]
+
+--report renders the LATEST STORED scan — no re-scan, no baseline
+mutation — so reviewing a drift finding never destroys the evidence it
+points at. It is the action every scan_finding page names.
 
 Design: docs/research/scanner-survey-mvp.md Part 2. Five scan types:
 discovery walk, .claude/ compromise checks, skill-manifest checks,
@@ -324,6 +328,12 @@ def _previous_fingerprints():
 
 def run_scan(roots=None, rebaseline=False):
     scan_id = "scan-" + time.strftime("%Y%m%d-%H%M%S")
+    d = store.base_dir() / "scans" / scan_id
+    n = 1
+    while d.exists():   # two scans in one second must not overwrite
+        n += 1
+        d = d.with_name(f"{scan_id}-{n}")
+    scan_id = d.name
     started = store.now()
     targets, skipped = discover(roots)
     prev_fps = _previous_fingerprints()
@@ -361,39 +371,48 @@ def run_scan(roots=None, rebaseline=False):
             "findings_by_severity": by_sev,
             "ruleset_sha256": scanrules.ruleset_sha256()}
 
-    d = store._mkdir_private(store.base_dir() / "scans" / scan_id)
+    store._mkdir_private(d)
     nd = d / "findings.ndjson"
     with open(nd, "w") as fh:
         for f in findings:
             fh.write(json.dumps(f, separators=(",", ":")) + "\n")
     store._chmod_private(nd)
+    meta["notify_routed"] = _route_to_notifier(findings)
     mp = d / "meta.json"
     mp.write_text(json.dumps(meta, indent=2))
     store._chmod_private(mp)
-    _route_to_notifier(findings)
     return meta, findings
 
 
 def _route_to_notifier(findings):
-    """Additional outlet, not a replacement: every finding becomes a notify
-    ledger row; the (scan_finding, actor_bucket) novelty tuple means at most
-    one banner per agent per window regardless of finding count — per-finding
-    detail lives here and in the scan report. info/low findings carry no
-    decision and are record_only (AGENTS.md doctrine) — except drift, which
-    always names a decision (rebaseline or revert)."""
+    """Route findings into the notify layer — config-audit is a second
+    alert-producing surface, not a replacement for the scan report. Every
+    finding becomes a notify ledger row; the (scan_finding, actor_bucket)
+    novelty tuple means at most one banner per agent per window regardless
+    of finding count — per-finding detail lives here and in `scan --report`.
+    The notify tier is capped at the category default (quiet by design; a
+    finding's own severity travels in the subject and the scan ledger).
+    info/low findings carry no decision and are record_only (AGENTS.md
+    doctrine) — except drift, which always names one (rebaseline or revert).
+    Resolved tombstone rows are bookkeeping, not findings — no rule_id, not
+    routed. Returns False when the notify layer is unavailable, and the
+    caller records that in meta so silence stays discoverable."""
     try:
         from fs_coil import notify as fs_notify
-    except ImportError:   # pip-installed llmsnitch without the vendored tree
-        return
+    except Exception:   # noqa: BLE001 — no vendored tree, or a broken one;
+        return False    # the scan must survive either
     for f in findings:
         if f.get("resolved"):
             continue
+        sev = f["severity"]
+        label = f"{sev} " if sev in ("critical", "high") else ""
         fs_notify.notify(   # never raises (fail-closed by contract)
             "config-audit", "scan_finding",
-            f"{f['rule_id']}: {f['artifact']}",
+            f"{label}{f['rule_id']}: {f['artifact']}",
             actor_bucket=f["agent"],
-            record_only=(f["severity"] in ("info", "low")
+            record_only=(sev in ("info", "low")
                          and not f["rule_id"].startswith("drift_")))
+    return True
 
 
 # -- emitters ----------------------------------------------------------------
@@ -402,6 +421,9 @@ def to_text(meta, findings):
     real = [f for f in findings if not f.get("resolved")]
     lines = [f"scan {meta['scan_id']}: {meta['files_scanned']} files, "
              f"{meta['files_skipped']} skipped"]
+    if meta.get("notify_routed") is False:
+        lines.append("note: notify layer unavailable — "
+                     "findings ledgered here only")
     sev = meta["findings_by_severity"]
     if not real:
         lines.append("[OK] no findings")
@@ -466,9 +488,36 @@ def to_sarif(meta, findings):
 
 # -- CLI ---------------------------------------------------------------------
 
+def _load_latest_scan():
+    """(meta, findings) of the newest stored scan, or None. Read-only —
+    tolerates a truncated findings tail like every other reader."""
+    scans = store.base_dir() / "scans"
+    try:
+        dirs = sorted(d for d in scans.iterdir() if d.is_dir())
+    except OSError:
+        return None
+    if not dirs:
+        return None
+    d = dirs[-1]
+    try:
+        meta = json.loads((d / "meta.json").read_text())
+        raw = (d / "findings.ndjson").read_text()
+    except (OSError, json.JSONDecodeError):
+        return None
+    findings = []
+    for line in raw.splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            findings.append(row)
+    return meta, findings
+
+
 def cmd_scan(argv, out):
     fmt, fail_on, roots, out_file = "text", "high", [], None
-    inventory = rebaseline = False
+    inventory = rebaseline = report = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -482,6 +531,8 @@ def cmd_scan(argv, out):
             inventory = True; i += 1
         elif a == "--rebaseline":
             rebaseline = True; i += 1
+        elif a == "--report":
+            report = True; i += 1
         elif a.startswith("--"):
             out.write(f"[ERROR] unknown flag: {a}\n")
             return 2
@@ -504,7 +555,14 @@ def cmd_scan(argv, out):
                   + "\n")
         return 0
 
-    meta, findings = run_scan(roots or None, rebaseline)
+    if report:
+        loaded = _load_latest_scan()
+        if loaded is None:
+            out.write("[ERROR] no stored scans — run `llmsnitch scan` first\n")
+            return 2
+        meta, findings = loaded
+    else:
+        meta, findings = run_scan(roots or None, rebaseline)
     text = {"text": to_text, "json": to_json, "sarif": to_sarif}[fmt](
         meta, findings)
     if out_file:

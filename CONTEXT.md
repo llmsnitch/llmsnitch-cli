@@ -9,7 +9,7 @@ these words.
 
 **Surface**:
 An alert-producing subsystem: `fs-coil-light`, `fs-coil-deep`,
-`session-shed`, `agent-flick`, or a future watcher.
+`session-shed`, `agent-flick`, `config-audit`, or a future watcher.
 _Avoid_: source, channel, tool
 
 **Outlet**:
