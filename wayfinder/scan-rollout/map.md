@@ -37,6 +37,11 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
 
 <!-- one line per closed ticket: gist + link -->
 
+- [T201 — Merge scan MVP to main + reinstall](tickets/T201-merge-and-reinstall.md) —
+  merged as `1dc6dc2`, suites green on main; install is **pipx**
+  (`pipx install --force ~/Repos/llmsnitch`), shim at
+  `~/.local/bin/llmsnitch`; installed CLI serves the scan MVP.
+
 - Grilling round 1+2 (pre-charting, recorded here since they shaped the map):
   destination = operational rollout (a); track B out of scope; scheduled
   scans + rule-pack in, redact-retroactive out; merge is the first ticket;
