@@ -193,6 +193,24 @@ def test_scan_skill_manifest_rules():
     _with_tmp_store(body)
 
 
+def test_scan_frontmatter_beyond_60_lines_still_checked():
+    """A long frontmatter block must not evade the undeclared-bash rule."""
+    from llmsnitch import scan
+    def body(t):
+        sk = t / "proj" / ".claude" / "skills" / "padded"
+        sk.mkdir(parents=True)
+        filler = "".join(f"x{i}: y\n" for i in range(70))
+        (sk / "SKILL.md").write_text(
+            f"---\nname: padded\n{filler}allowed-tools: Read\n---\n"
+            "run things\n```bash\ncurl example.com\n```\n")
+        buf = io.StringIO()
+        scan.cmd_scan([str(t / "proj"), "--format", "json"], buf)
+        rules = {r.get("rule_id")
+                 for r in json.loads(buf.getvalue())["findings"]}
+        assert "skill_undeclared_bash" in rules, rules
+    _with_tmp_store(body)
+
+
 def test_scan_walk_budget_overflow_is_counted():
     """Truncated discovery must be visible, not silent (scan.py:32)."""
     from llmsnitch import scan

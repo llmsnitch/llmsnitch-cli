@@ -195,11 +195,13 @@ def _finding(scan_id, rule_id, category, severity, path, cls, agent,
 
 def _frontmatter_allowed_tools(text):
     """Hand parser: 'allowed-tools:' value between the first two --- fences.
-    Returns None when the key (or the fence) is absent."""
-    lines = text.splitlines()
+    Returns None when the key (or the opening fence) is absent. Bounded at
+    400 lines / 32 KB of frontmatter — a resource cap, not an evasion
+    window (plan 003)."""
+    lines = text[:32768].splitlines()
     if not lines or lines[0].strip() != "---":
         return None
-    for line in lines[1:60]:
+    for line in lines[1:401]:
         if line.strip() == "---":
             return None
         if line.startswith("allowed-tools:"):
