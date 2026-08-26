@@ -83,6 +83,11 @@ The three tests from `AGENTS.md` every page must pass: Decision, Actor,
 Novelty.
 _Avoid_: notification rules
 
+**Patrol**:
+An unattended, scheduled run of the `config-audit` surface (`llmsnitch
+scan` fired by a LaunchAgent). A manual `scan` is not a patrol.
+_Avoid_: cron scan, sweep, scheduled job
+
 **Harness**:
 An AI coding agent product whose activity llmsnitch traces (Claude Code,
 Codex CLI, Cursor, …). The thing an adapter supports.
