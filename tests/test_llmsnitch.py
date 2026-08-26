@@ -193,6 +193,26 @@ def test_scan_skill_manifest_rules():
     _with_tmp_store(body)
 
 
+def test_scan_walk_budget_overflow_is_counted():
+    """Truncated discovery must be visible, not silent (scan.py:32)."""
+    from llmsnitch import scan
+    def body(t):
+        root = t / "proj" / ".claude" / "skills" / "s"
+        root.mkdir(parents=True)
+        for i in range(12):
+            (root / f"SKILL{i}.py").write_text("print()\n")
+        (root / "SKILL.md").write_text("---\nname: s\n---\nhi\n")
+        old = scan._MAX_FILES
+        scan._MAX_FILES = 5
+        try:
+            targets, skipped = scan.discover([str(t / "proj")])
+        finally:
+            scan._MAX_FILES = old
+        assert skipped > 0, "budget overflow was silent"
+        assert len(targets) <= 5
+    _with_tmp_store(body)
+
+
 def test_scan_rules_resist_redos():
     """A crafted long line must not hang the ruleset (measured pre-fix:
     42s for 200KB of 'curl '; budget here is generous CI headroom)."""

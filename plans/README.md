@@ -11,7 +11,7 @@ conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Fix ReDoS in scan rules (+ adversarial tests) | P1 | M | — | TODO |
+| 001 | Fix ReDoS in scan rules (+ adversarial tests) | P1 | M | — | DONE |
 | 002 | Make walk-budget truncation visible | P1 | S | — | TODO |
 | 003 | Frontmatter parse to fence, not 60-line window | P2 | S | — | TODO |
 

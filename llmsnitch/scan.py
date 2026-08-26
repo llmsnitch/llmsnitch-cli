@@ -29,7 +29,8 @@ _SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 _SARIF_LEVEL = {"critical": "error", "high": "error",
                 "medium": "warning", "low": "note", "info": "note"}
 _MAX_FILE = 1_000_000   # bytes; larger artifacts are inventoried, not read
-_MAX_FILES = 4000       # walk cap; overflow is counted, never silent
+_MAX_FILES = 4000       # walk cap; overflow reports a nonzero skipped
+                        # count (truncation flag, not an exact miss tally)
 _MAX_DEPTH = 6
 _EVIDENCE_CAP = 180     # clawscan static_scanner.go:17 discipline
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv",
@@ -95,9 +96,9 @@ def _walk(root, budget):
                                 (".claude", ".cursor", ".codex", ".github",
                                  ".agents", ".windsurf", ".gemini"))]
         for fn in sorted(filenames):
-            if budget[0] <= 0:
+            budget[0] -= 1        # decrement first: exhaustion must go
+            if budget[0] < 0:     # negative so discover() can report it
                 return
-            budget[0] -= 1
             yield Path(dirpath) / fn
 
 
