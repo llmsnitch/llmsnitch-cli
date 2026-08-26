@@ -8,9 +8,6 @@
   llmsnitch patrol [--write]  print/install the daily scan LaunchAgent
   llmsnitch ingest            sweep harness ledgers (also runs lazily
                               before list/show/check)
-  llmsnitch migrate-paths     move legacy ~/.config/llm-snitch, ~/Library/
-                              Logs|Caches/llm-snitch to the dashless paths
-                              (idempotent; leaves compat symlinks)
   llmsnitch hook <event>      internal — invoked by Claude Code hooks
 """
 
@@ -106,9 +103,6 @@ def main(argv=None):
         from . import ingest
         out.write(f"ingested/updated {ingest.sweep()} session(s)\n")
         return 0
-    if cmd == "migrate-paths":
-        from . import migrate_paths
-        return migrate_paths.run(out)
     if cmd in ("list", "show", "check"):
         try:                       # lazy sweep (contract C8) — never blocks reads
             from . import ingest
