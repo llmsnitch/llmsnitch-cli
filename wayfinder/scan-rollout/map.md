@@ -1,7 +1,10 @@
 # Scan Rollout — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN`
+`status: CLOSED (2026-08-26) — destination reached: the patrol is live
+(com.slav-it.llmsnitch-patrol, daily 09:30), first run ledgered with
+trigger=patrol and findings routed through the notify layer (T204's four
+criteria verified). Residual fog below is inherited by future efforts.`
 
 ## Destination
 
@@ -49,6 +52,12 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
   shipped as `2da768b`; SD-022 per ticket, SD-020 deviates twice toward
   upstream (settings-only scope, hygiene/low category — the decision is
   "quote it"); real-machine smoke clean.
+- [T204 — Activate the patrol](tickets/T204-activate-patrol.md) —
+  **destination reached**: patrol live (daily 09:30), four criteria
+  verified, 0 banners (cold start, by design), live drift caught on
+  `~/.claude.json`; fs_coil now ships in the wheel (pipx venv had no
+  notify layer — found and fixed live); second-merge rhythm: batch into
+  activation merges.
 
 - Grilling round 1+2 (pre-charting, recorded here since they shaped the map):
   destination = operational rollout (a); track B out of scope; scheduled
@@ -69,8 +78,6 @@ merged to main and reinstalled, a daily **patrol** (LaunchAgent
 - **Project-directory patrols** — per-repo scanning (cwd-scoped) beyond the
   home territories; question isn't sharp until home patrol behavior is
   observed for a while (noise level, runtime).
-- **Second-merge rhythm** — whether T202/T203 merge to main individually or
-  ride T204's activation merge; decide when T204 is claimed.
 
 ## Out of scope
 
