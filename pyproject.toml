@@ -15,4 +15,8 @@ dependencies = []          # stdlib only, forever — this is a design constrain
 llmsnitch = "llmsnitch.cli:main"
 
 [tool.setuptools]
-packages = ["llmsnitch"]
+# fs_coil ships too: the scan's notify routing imports it, and a pipx venv
+# without it silently degrades to ledger-only (T204 found this live).
+# Both copies (this one and the /usr/local/share live tree) converge on the
+# same flock'd on-disk state, so coexistence is safe.
+packages = ["llmsnitch", "fs_coil"]
