@@ -74,10 +74,32 @@ RULES = [
     ("invisible_unicode", _C, "critical",
      ("claude_settings", "hook_script", "mcp_config", "skill_manifest"),
      re.compile("[​-‏‪-‮⁦-⁩\U000e0020-\U000e007f]")),
+    # DNS tunneling (port of skill-detector SD-022, pkg/rules/dns_exfil.go):
+    # a DNS command + dynamically-built hostname + dotted name on ONE line —
+    # the conjunction is the FP suppressor (static `dig example.com` never
+    # fires). Anchored lookaheads: search succeeds/fails at position 0 only,
+    # so each lookahead is one linear scan (ReDoS discipline, plan 001).
+    # Upstream rates HIGH; compromise-shaped here per T203.
+    ("dns_exfil_dynamic_host", _C, "critical",
+     ("hook_script", "skill_script"),
+     re.compile(r"^(?=.{0,4096}\b(dig|nslookup|drill|resolvectl|host)\s)"
+                r"(?=.{0,4096}(\$\(|`|\$\{?\w))"
+                r"(?=.{0,4096}\.[A-Za-z]{2,})")),
     # -- hygiene (never pages; digest only) ----------------------------------
     ("skill_base64_blob", _H, "low",
      ("skill_manifest", "instruction_file"),
      re.compile(r"[A-Za-z0-9+/]{120,}={0,2}")),
+    # Unquoted $VAR in a settings-JSON hook command (port of skill-detector
+    # SD-020, pkg/rules/hooks.go: reUnquotedVar + CLAUDE_* exemption).
+    # Raw-JSON equivalent of upstream's decoded-string check: a decoded
+    # quote before $ appears as \" in raw JSON, hence the (?<!\\") guard.
+    # Scoped to claude_settings only, like upstream — $VAR in shell scripts
+    # is normal. Hygiene, not compromise: the decision is "quote it"
+    # (deviation from T203's category, recorded in its resolution).
+    ("hook_unquoted_var", _H, "low",
+     ("claude_settings",),
+     re.compile(r'"command"\s*:\s*"(?:[^"\\]|\\.){0,400}?'
+                r'(?<!\\")\$\{?(?!CLAUDE_)[A-Za-z_]')),
 ]
 
 # Secret shapes at rest: hook._SECRET (single source of truth) + issuer
