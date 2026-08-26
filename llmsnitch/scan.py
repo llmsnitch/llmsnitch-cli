@@ -493,12 +493,11 @@ def _load_latest_scan():
     tolerates a truncated findings tail like every other reader."""
     scans = store.base_dir() / "scans"
     try:
-        dirs = sorted(d for d in scans.iterdir() if d.is_dir())
+        d = max((p for p in scans.iterdir() if p.is_dir()), default=None)
     except OSError:
         return None
-    if not dirs:
+    if d is None:
         return None
-    d = dirs[-1]
     try:
         meta = json.loads((d / "meta.json").read_text())
         raw = (d / "findings.ndjson").read_text()
