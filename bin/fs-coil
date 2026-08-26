@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Thin entry point. Resolves the fs_coil package and dispatches to cli.main."""
+import os
+import sys
+
+_HERE = os.path.dirname(os.path.realpath(__file__))
+_CANDIDATES = (
+    _HERE,                                        # dev: src/fs_coil next to this
+    "/usr/local/share/llm-snitch",               # prod install location
+)
+for _c in _CANDIDATES:
+    if os.path.isdir(os.path.join(_c, "fs_coil")):
+        if _c not in sys.path:
+            sys.path.insert(0, _c)
+        break
+
+from fs_coil.cli import main
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(130)
