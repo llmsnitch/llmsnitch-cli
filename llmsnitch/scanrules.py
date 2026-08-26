@@ -37,16 +37,21 @@ _H = "scan_hygiene"
 
 RULES = [
     # -- compromise: control surfaces + skill/hook scripts ------------------
+    # Bounded runs throughout: these rules face attacker-sized lines, and an
+    # unbounded quantifier next to an overlapping class backtracks
+    # quadratically (plan 001; regression lock: test_scan_rules_resist_redos).
     ("hook_curl_pipe_shell", _C, "critical",
      ("claude_settings", "hook_script", "mcp_config", "skill_script"),
-     re.compile(r"\b(curl|wget)\s+[^|;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b")),
+     re.compile(r"\b(curl|wget)\s[^|;]{0,400}\|\s*(sudo\s+)?(ba|z|da)?sh\b")),
     ("hook_base64_decode_shell", _C, "critical",
      ("claude_settings", "hook_script", "mcp_config", "skill_script"),
-     re.compile(r"base64\s+(-d|-D|--decode)\S*\s*[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b")),
+     re.compile(r"base64\s+(-d|-D|--decode)\S*[^|]{0,400}\|\s*(sudo\s+)?(ba|z)?sh\b")),
     ("hook_reverse_shell", _C, "critical",
      ("claude_settings", "hook_script", "mcp_config", "skill_script",
       "skill_manifest"),
-     re.compile(r"(bash\s+-i\s+>&\s*/dev/tcp/|/dev/tcp/\d|nc\s+(-\w*e\w*\s|.*\s-e\s)|mkfifo\s+/tmp/\S+\s*;.*\|\s*(ba|z)?sh)")),
+     re.compile(r"(bash\s+-i\s+>&\s*/dev/tcp/|/dev/tcp/\d"
+                r"|nc\s(-\w*e\w*\s|[^\n]{0,200}\s-e\s)"
+                r"|mkfifo\s+/tmp/\S+\s*;[^\n|]{0,200}\|\s*(ba|z)?sh)")),
     # ponytail: exact "Bash" / "Bash(*)" only (skill-detector's core shapes);
     # scoped wildcards like Bash(*terraform*) and hook '"matcher": "Bash"'
     # lines are deliberate non-matches. Widen only with a JSON-aware check.

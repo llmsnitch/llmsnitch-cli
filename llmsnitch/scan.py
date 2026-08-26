@@ -216,6 +216,8 @@ def scan_file(scan_id, path, cls, agent):
     if text.startswith("﻿"):   # leading BOM is benign
         body = text[1:]
     for line_no, line in enumerate(body.splitlines(), 1):
+        if len(line) > 4096:    # rules face attacker-sized lines; a real
+            line = line[:4096]  # config line never approaches this
         canon = hook._canonical(line)
         for rid, cat, sev, classes, rx in scanrules.RULES:
             if cls in classes and (rx.search(line) or

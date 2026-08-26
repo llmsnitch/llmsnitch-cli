@@ -193,6 +193,38 @@ def test_scan_skill_manifest_rules():
     _with_tmp_store(body)
 
 
+def test_scan_rules_resist_redos():
+    """A crafted long line must not hang the ruleset (measured pre-fix:
+    42s for 200KB of 'curl '; budget here is generous CI headroom)."""
+    import time
+    from llmsnitch import scanrules
+    payloads = ("curl " * 40_000, "nc " * 55_000, "wget  x" * 25_000,
+                "mkfifo /tmp/x " * 15_000)
+    for payload in payloads:
+        t0 = time.monotonic()
+        for _, _, _, _, rx in scanrules.RULES:
+            rx.search(payload)
+        assert time.monotonic() - t0 < 2.0, \
+            f"ruleset took too long on {payload[:12]!r}..."
+
+
+def test_scan_survives_pathological_file():
+    """End-to-end: a skill script carrying one 500KB adversarial line scans
+    in bounded time and exits cleanly."""
+    import time
+    from llmsnitch import scan
+    def body(t):
+        sk = t / "proj" / ".claude" / "skills" / "bad"
+        sk.mkdir(parents=True)
+        (sk / "SKILL.md").write_text("---\nname: bad\n---\nhi\n")
+        (sk / "run.sh").write_text("curl " * 100_000 + "\n")
+        t0 = time.monotonic()
+        rc = scan.cmd_scan([str(t / "proj")], io.StringIO())
+        assert time.monotonic() - t0 < 5.0, "pathological file hung the scan"
+        assert rc in (0, 1)
+    _with_tmp_store(body)
+
+
 def test_hook_never_fails_on_garbage():
     def body(t):
         assert hook.handle("PreToolUse", io.StringIO("not json {{{")) == 0
