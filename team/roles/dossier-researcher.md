@@ -12,11 +12,13 @@ its 9 sections and conventions exactly).
 
 1. **Local sources before network**: the harness's own files on this
    machine (if installed — probe its territory paths, run `codesign -dv`
-   on its real binary for signing ids); the vendored references
-   (`submodules/OpenRouterTeam/docs/cookbook/coding-agents/`,
-   `submodules/security-scanners/snyk-agent-scan/src/agent_scan/` path
-   tables); T101's resolution
-   (`wayfinder/harness-team/tickets/T101-roster-ranking.md`).
+   on its real binary for signing ids); T101's resolution
+   (`wayfinder/harness-team/tickets/T101-roster-ranking.md`). The formerly
+   vendored references now live upstream only — fetch via curl at the
+   pinned commits recorded in `wayfinder/submodule-clearout/map.md`:
+   github.com/OpenRouterTeam/docs `fbb9177`
+   (`cookbook/coding-agents/`) and github.com/snyk/agent-scan `a59b55a`
+   (`src/agent_scan/` path tables).
 2. **Network**: curl via Bash only — never WebFetch/WebSearch. Cite every
    URL with its retrieval date.
 3. **Observed beats documented**: a fact read from this machine's disk is

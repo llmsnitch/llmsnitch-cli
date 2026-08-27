@@ -305,10 +305,13 @@ relationship that held on all 84 sessions here.
    `session_index.jsonl` key dumps.
 2. `wayfinder/harness-team/tickets/T101-roster-ranking.md:72,105,115-127` —
    roster rank 1, admission PASS, T106 pilot target, prior path confirmation.
-3. `submodules/security-scanners/snyk-agent-scan/src/agent_scan/agents/codex.py:45-87,346-347`
+3. github.com/snyk/agent-scan @ `a59b55a` (submodule since cleared —
+   pin table: `wayfinder/submodule-clearout/map.md`)
+   `src/agent_scan/agents/codex.py:45-87,346-347`
    and `well_known_clients.py:97-100,187-190` — config/skill/plugin path
    tables, `CODEX_HOME`, `/etc/codex`, `~/.agents/skills`.
-4. `submodules/OpenRouterTeam/docs/cookbook/coding-agents/codex-cli.mdx:37,155,167`
+4. github.com/OpenRouterTeam/docs @ `fbb9177` (submodule since cleared)
+   `cookbook/coding-agents/codex-cli.mdx:37,155,167`
    — `~/.codex/config.toml` as the model-routing seam; OpenRouter slugs as
    legal codex model ids (the §4 warning).
 5. `dossiers/claude-code.md` — exemplar format and the interrupted-is-not-an-error
