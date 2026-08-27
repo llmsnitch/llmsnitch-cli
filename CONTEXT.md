@@ -9,7 +9,8 @@ these words.
 
 **Surface**:
 An alert-producing subsystem: `fs-coil-light`, `fs-coil-deep`,
-`session-shed`, `agent-flick`, `config-audit`, or a future watcher.
+`config-audit`, or a future watcher. (The `session-shed` / `agent-flick`
+wrapper surfaces were retired 2026-08-27 — `wayfinder/rd-triage/map.md`.)
 _Avoid_: source, channel, tool
 
 **Outlet**:

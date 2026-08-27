@@ -81,10 +81,16 @@ In scope — all llmsnitch alert surfaces (D02):
 |---|---|---|
 | `fs-coil-light` | fswatch/FSEvents watcher (writes only, no FDA) | user LaunchAgent `com.slav-it.fs-coil` |
 | `fs-coil-deep` | eslogger watcher (reads + writes + execs, needs FDA) | root LaunchDaemon `com.slav-it.llmsnitch` |
-| `session-shed` | agenttrace health-gate wrapper | user, periodic |
-| `agent-flick` | agent-strace cost-gate wrapper | user, periodic |
 | `config-audit` | `llmsnitch scan` — cold-path config audit over agent artifacts | user, on demand |
 | *(future)* | any new watcher (e.g. proc-eye) calls the same API | — |
+
+> **Retired surfaces (2026-08-27, `wayfinder/rd-triage/map.md`)**: the
+> `session-shed` (agenttrace health-gate wrapper) and `agent-flick`
+> (agent-strace cost-gate wrapper) surfaces were cleared from the repo —
+> their wrapped upstream binaries are not installed and llmsnitch is the
+> reimplementation. Live copies at `/usr/local/bin/` are inherited by
+> track B. `threshold_breach` remains a reserved category for a future
+> gate emitter.
 
 Config groups `fs-coil-light` and `fs-coil-deep` under one policy section
 `[notify.fs-coil]`; the ledger keeps them distinct in the `surface` field.
@@ -182,8 +188,8 @@ path page even during the learning window.
 
 **Event sources**: `notify()` is only ever called for events that already
 cleared a surface-level trigger — a deny-list match (`match_deny`) in the
-watchers, a keychain-classified exec in deep mode, or an `edge_alert`
-verdict transition in the wrappers. The notify layer never scans paths
+watchers, a keychain-classified exec in deep mode, or (retired surfaces)
+an `edge_alert` verdict transition. The notify layer never scans paths
 itself; the deny-list matcher stays the event source (out of scope to
 rewrite). `classify_event` then *refines* a watcher event by territory —
 which is why `deny_pattern` is required for every watcher-originated event
@@ -196,7 +202,7 @@ chain:
 | # | Step | In | Out |
 |---|---|---|---|
 | 1 | `attribute_actor` | `pinfo` / `ppid` / path | `actor_bucket`, `actor_raw` |
-| 2 | `classify_event` (watcher events; wrappers pass `threshold_breach` directly, deep-mode keychain/self-read callers pass their category directly) | path, mode, `actor_bucket` | `category`, `actor_mismatch` |
+| 2 | `classify_event` (watcher events; edge-triggered gate callers pass `threshold_breach` directly, deep-mode keychain/self-read callers pass their category directly) | path, mode, `actor_bucket` | `category`, `actor_mismatch` |
 | 3 | severity derivation | `category`, `actor_mismatch`, `deny_pattern` vs critical-rule tags | `severity` |
 | 4 | novelty gate — under the hot-state lock, resolve the tuple: `first_seen` (never seen → page), `window_expired` (last page older than window → page), `window_repeat` (inside window → suppress, count++), `edge` (`threshold_breach` only — its window is 0, so every call pages; the "certification" that this is a real transition is structural: `edge_alert` only invokes its callbacks on transitions, so no parameter is needed) | tuple, hot state, now | preliminary `novelty_reason`, `notified` |
 | 5 | cold-start override — if `now < install_ts + cold_start` and severity ≠ `critical`: force `novelty_reason=cold_start_suppressed`. **Precedence: cold start beats `edge`** — a first-day cost breach lands in ledger + digest, not NC (D23 is categorical; only `critical` pierces it). `last_notified_ts` is NOT updated for a cold-start-suppressed event | step-4 result, `install_ts` | final `novelty_reason` |
@@ -252,7 +258,7 @@ config (D05): config selects and tunes, it never invents categories.
 | `deny_write` | Write to a watched sensitive path by an unrecognized actor — or by a registered agent into *another* agent's dirs (`actor_mismatch` set, severity `critical`) | 1h | high | investigate the writing process; revoke/kill if unexpected |
 | `deny_read` | Deep mode: read of a watched path by an unrecognized actor | 5m | high | investigate; rotate the credential if unexpected |
 | `keychain_access` | Deep mode: `security find-generic-password` etc. by a watched process (except when `agent_signed_self_read` matches — predicate `is_signed_self_read(pinfo, path)`, which lives in `fs_coil/agent_registry.py`; `monitor.py` calls it and passes the resulting category) | 5m | high | check which item was read; rotate if unexpected |
-| `threshold_breach` | session-shed / agent-flick verdict transition | edge-triggered (0) | high | review the session (`session-shed`, `agent-flick` report); kill the runaway session |
+| `threshold_breach` | gate verdict transition (reserved — original wrapper emitters retired 2026-08-27) | edge-triggered (0) | high | review the session; kill the runaway session |
 | `scan_finding` | `llmsnitch scan` finding routed by the config-audit surface. **Quiet by design**: the notify tier is capped at `high` and never pierces cold start — a critical finding is labeled in the subject (`critical <rule_id>: <path>`; other severities carry no label, the alert tier already says `high`), and every finding's full severity lives in the scan's own ledger; `scan --report` is the loud, complete view. info/low findings are `record_only` (no decision) except `drift_*`, which always names one (rebaseline or revert). | 24h | high | review the findings: `llmsnitch scan --report` |
 
 Windows are expressed as duration strings: integer + `s`/`m`/`h`/`d`.
@@ -525,11 +531,9 @@ what a user *may* write.
 | Surface id | Section consulted |
 |---|---|
 | `fs-coil-light`, `fs-coil-deep` | `[notify.fs-coil]` |
-| `session-shed` | `[notify.session-shed]` |
-| `agent-flick` | `[notify.agent-flick]` |
 | `config-audit` | `[notify.config-audit]` |
 
-Only these four section names are consulted; anything else under
+Only these two section names are consulted; anything else under
 `[notify.*]` is ignored (so a stray `[notify.fs-coil-light]` has no
 effect). `enabled = false` in a surface section stops that surface's
 *paging* only — its events still ledger; `[notify] enabled = false` does
@@ -560,12 +564,6 @@ window_deny_write@git = 4h
 [notify.fs-coil]               # governs BOTH fs-coil-light and fs-coil-deep
 enabled = true
 window_deny_read = 5m
-
-[notify.session-shed]
-enabled = true
-
-[notify.agent-flick]
-enabled = true
 
 [agent.claude-code]            # registry axis — identification, not policy
 # Extends/overrides the built-in entry; lists are comma-separated.
@@ -788,6 +786,11 @@ wrappers need no restart (invoked per-run).
   BEFORE deleting it; foreground smoke on both modes; existing tests green.
 
 ### T006 — Wire session-shed + agent-flick
+
+> **Retired (2026-08-27, `wayfinder/rd-triage/map.md`)**: the repo copies of
+> these wrappers were cleared (upstream binaries absent); this ticket is
+> moot unless the wrapped upstreams are ever reinstalled. Kept for the
+> track B record. Original ticket text follows.
 
 - **Touch**: `bin/session-shed`, `bin/agent-flick` — both scripts define
   local `_on_breach` / `_on_recover` callbacks and pass them to

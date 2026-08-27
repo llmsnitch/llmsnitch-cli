@@ -103,7 +103,7 @@ def test_window_expired_repages_and_resets_window_fields():
 def test_edge_pages_every_call():
     def body(t, delivered, errors):
         for i in range(3):
-            assert nf.notify("session-shed", "threshold_breach",
+            assert nf.notify("gate", "threshold_breach",
                              "cost 6.10 > ceiling 5.00", _now=T0 + i) is True
         assert [r["novelty_reason"] for r in _rows(t)][1:] == ["edge", "edge"]
         assert len(delivered) == 3
@@ -115,7 +115,7 @@ def test_cold_start_suppresses_high_even_edge_but_not_critical():
     def body(t, delivered, errors):
         r1 = nf.notify("fs-coil-light", "deny_write", "~/.ssh/a",
                        deny_pattern="~/.ssh/**", _now=T0)          # high
-        r2 = nf.notify("session-shed", "threshold_breach", "b", _now=T0)  # edge
+        r2 = nf.notify("gate", "threshold_breach", "b", _now=T0)  # edge
         r3 = nf.notify("fs-coil-deep", "deny_write", "~/.codex/c",
                        actor_bucket="aider", deny_pattern="~/.codex/**",
                        actor_mismatch="codex", _now=T0)            # critical
@@ -142,7 +142,7 @@ def test_critical_patterns_pierce_cold_start():
 
 def test_record_only_ledgers_never_banners_never_burns_slot():
     def body(t, delivered, errors):
-        r = nf.notify("session-shed", "threshold_breach", "recovered",
+        r = nf.notify("gate", "threshold_breach", "recovered",
                       record_only=True, _now=T0)
         assert r is False and not delivered
         row = _rows(t)[0]

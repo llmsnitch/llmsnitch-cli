@@ -45,6 +45,9 @@ edit about itself.
 llmsnitch list             # sessions: tools, errors, health, cost
 llmsnitch show <id>        # one session in detail
 llmsnitch check            # gate: exit 0 pass / 1 breach / 2 error
+llmsnitch ingest           # sweep non-Claude harness ledgers (codex, ...)
+llmsnitch scan             # config-audit over agent artifacts
+llmsnitch patrol           # print/--write the daily-scan LaunchAgent
 ```
 
 Thresholds in `~/.config/llmsnitch/config`:

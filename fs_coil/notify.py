@@ -49,11 +49,9 @@ CATEGORIES = {
 _SURFACE_SECTION = {          # fixed surface -> config-section map
     "fs-coil-light": "notify.fs-coil",
     "fs-coil-deep":  "notify.fs-coil",
-    "session-shed":  "notify.session-shed",
-    "agent-flick":   "notify.agent-flick",
     "config-audit":  "notify.config-audit",
 }
-_GLYPH = {"fs-coil-deep": "🦍"}   # default 🐍 (light + wrappers)
+_GLYPH = {"fs-coil-deep": "🦍"}   # default 🐍
 
 _WINDOW_RE = re.compile(r"^(\d+)([smhd]?)$")
 _MULT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}
