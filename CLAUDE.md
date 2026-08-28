@@ -54,7 +54,7 @@ Run one test: there is no framework, just call it — `python3 -c "from tests.te
 
 ## House rules (from user global instructions and repo memory)
 
-- **This repo is local-only.** Never add a remote, never suggest `git push` / GitHub / PRs. (Memory: `llmsnitch-git-local-only`.)
+- **Published under the owner's `llmsnitch` GitHub account** (`github.com/llmsnitch/llmsnitch-cli`, public since 2026-08-21; local-only rule retired 2026-08-27). Pushing requires the `llmsnitch` account — the `llmsnitch` token is pull-only. The pre-publication working repo at `~/Repos/llmsnitch` remains remote-less.
 - **Never run `install.sh`.**
 - **Never use `rm` / `rm -rf`.** Use `trash` (no fallback).
 - Every notification design decision grounds on the map at `wayfinder/map.md` (D01–D27) and the actionability test in `AGENTS.md` — Decision, Actor, Novelty.
