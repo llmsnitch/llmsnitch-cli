@@ -234,7 +234,7 @@ def cmd_test():
     if os.geteuid() != 0:
         warn("test mode needs sudo — eslogger requires root")
         sys.exit(1)
-    print_banner(show_head=True)
+    print_banner()
     head("test mode")
     item("matches print to stdout, no notifications")
     item(f"{_DIM}Ctrl-C to stop{_R}" if _tty() else "Ctrl-C to stop")

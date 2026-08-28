@@ -130,46 +130,17 @@ def src_info(path):
     return {"path": _clean(str(path)), "sha256": h.hexdigest()}
 
 
+# Only fields ingest.sweep reads: session_paths, home_env, home_default,
+# parser. Everything else a harness dossier records (signing ids, config
+# paths, tiers) lives in dossiers/<name>.md — facts, not code. claude-code
+# has no entry: its live capture ships via hooks, and a ledger parser for
+# its transcripts is a future team run (contract C2 diff-check).
 HARNESSES = {
-    # dossiers/claude-code.md §8 — live capture ships today; ledger parser
-    # for its transcripts is a future team run (contract C2 diff-check).
-    "claude-code": {
-        "session_paths": ["~/.claude/projects/*/*.jsonl"],
-        "session_format": "jsonl",
-        "config_paths": ["~/.claude/settings.json", "~/.claude.json"],
-        "registry": {
-            "paths": ["~/.claude"],
-            "exes": ["claude"],
-            "signing_ids": ["com.anthropic.claude-code"],  # observed 2026-08-24, team Q6L2SF6YDW
-            "cache_paths": ["~/.claude/plugins/cache"],
-        },
-        "parser": None,
-        "tier": "live+ledger",
-        "provider_families": {"": "anthropic"},
-    },
     # dossiers/codex.md §8
     "codex": {
         "session_paths": ["~/.codex/sessions/*/*/*/rollout-*.jsonl"],
         "home_env": "CODEX_HOME",               # trap 9: relocates ~/.codex
         "home_default": "~/.codex",
-        "session_format": "jsonl",
-        "config_paths": ["~/.codex/config.toml", "~/.codex/hooks.json",
-                         "/etc/codex/config.toml"],
-        "registry": {
-            "paths": ["~/.codex"],
-            "exes": ["codex"],
-            "signing_ids": ["codex"],           # observed 2026-08-25, team 2DC432GLL2
-            "cache_paths": ["~/.codex/cache", "~/.codex/.tmp", "~/.codex/tmp",
-                            "~/.codex/log", "~/.codex/shell_snapshots",
-                            "~/.codex/thread-writer-locks",
-                            "~/.codex/*.sqlite-wal", "~/.codex/*.sqlite-shm",
-                            "~/.codex/models_cache.json",
-                            "~/.codex/cloud-config-bundle-cache.json"],
-        },
         "parser": parse_codex,
-        "tier": "ledger",
-        "provider_families": {"gpt-": "openai", "o1": "openai", "o3": "openai",
-                              "o4": "openai", "codex-": "openai",
-                              "azureml://": "openai", "": "openai"},
     },
 }

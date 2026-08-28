@@ -8,50 +8,18 @@ import io
 import json
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from fs_coil import notify as nf  # noqa: E402
 from llmsnitch import scan        # noqa: E402
+from tests._seams import rows as _rows, run, with_tmp  # noqa: E402
 
 
 def _with_tmp(fn):
-    """LLMSNITCH_DIR (scan store) + the notify seams from test_notify.py,
-    cold_start=0 so first-seen findings may banner, _deliver/_log_error
-    stubbed."""
-    with tempfile.TemporaryDirectory() as td:
-        t = Path(td)
-        (t / "cache").mkdir()
-        (t / "config.ini").write_text("[notify]\ncold_start = 0\n")
-        env = {"LLMSNITCH_DIR": str(t / "store"),
-               "LLMSNITCH_NOTIFY_DIR": str(t / "notify"),
-               "LLMSNITCH_HOT_STATE": str(t / "cache" / "notify-state.json"),
-               "LLMSNITCH_CONFIG": str(t / "config.ini")}
-        old = {k: os.environ.get(k) for k in env}
-        os.environ.update(env)
-        delivered, errors = [], []
-        old_deliver, old_log = nf._deliver, nf._log_error
-        nf._deliver = lambda *a, **k: delivered.append(a)
-        nf._log_error = errors.append
-        try:
-            fn(t, delivered, errors)
-        finally:
-            nf._deliver, nf._log_error = old_deliver, old_log
-            for k, v in old.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-
-
-def _rows(t):
-    out = []
-    for f in sorted((t / "notify").glob("events-*.ndjson")):
-        out += [json.loads(line) for line in f.read_text().splitlines()]
-    return out
+    """Notify seams + LLMSNITCH_DIR (scan store), cold_start=0."""
+    with_tmp(fn, store=True)
 
 
 def _seed(root):
@@ -238,23 +206,5 @@ def test_notifier_failure_never_breaks_scan():
     _with_tmp(body)
 
 
-def main():
-    tests = [v for k, v in sorted(globals().items())
-             if k.startswith("test_") and callable(v)]
-    failed = 0
-    for fn in tests:
-        try:
-            fn()
-            print(f"PASS {fn.__name__}")
-        except AssertionError as e:
-            failed += 1
-            print(f"FAIL {fn.__name__}: {e}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"ERROR {fn.__name__}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-    sys.exit(1 if failed else 0)
-
-
 if __name__ == "__main__":
-    main()
+    sys.exit(run(globals()))

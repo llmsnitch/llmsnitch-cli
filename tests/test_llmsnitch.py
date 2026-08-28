@@ -152,18 +152,14 @@ def test_scan_novelty_and_drift():
     _with_tmp_store(body)
 
 
-def test_scan_sarif_and_exit_codes():
-    """SARIF 2.1.0 envelope; clean tree exits 0; bad root exits 2."""
+def test_scan_exit_codes():
+    """Clean tree exits 0; bad root and bad format exit 2."""
     from llmsnitch import scan
     def body(t):
         root = t / "clean"
         (root / ".claude").mkdir(parents=True)
         ((root / ".claude") / "settings.json").write_text('{"model": "opus"}')
-        buf = io.StringIO()
-        assert scan.cmd_scan([str(root), "--format", "sarif"], buf) == 0
-        doc = json.loads(buf.getvalue())
-        assert doc["version"] == "2.1.0" and "sarif-schema-2.1.0" in doc["$schema"]
-        assert doc["runs"][0]["tool"]["driver"]["name"] == "llmsnitch"
+        assert scan.cmd_scan([str(root)], io.StringIO()) == 0
         assert scan.cmd_scan(["/no/such/root/xyz"], io.StringIO()) == 2
         assert scan.cmd_scan(["--format", "yaml"], io.StringIO()) == 2
     _with_tmp_store(body)
@@ -628,22 +624,6 @@ def test_no_network_imports():
             assert f"import {banned}" not in src, (p.name, banned)
 
 
-def main():
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    failed = 0
-    for t in tests:
-        try:
-            t()
-            print(f"PASS {t.__name__}")
-        except AssertionError as e:
-            failed += 1
-            print(f"FAIL {t.__name__}: {e}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"ERROR {t.__name__}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-    sys.exit(1 if failed else 0)
-
-
 if __name__ == "__main__":
-    main()
+    from tests._seams import run
+    sys.exit(run(globals()))

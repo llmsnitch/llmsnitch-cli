@@ -1,8 +1,8 @@
 """llmsnitch scan — cold-path config audit over agent artifacts.
 
-  llmsnitch scan [ROOT ...] [--format text|json|sarif]
-                 [--fail-on critical|high|medium] [--inventory]
-                 [--rebaseline] [--report] [--out FILE]
+  llmsnitch scan [ROOT ...] [--format text|json]
+                 [--fail-on critical|high|medium]
+                 [--rebaseline] [--report] [--patrol]
 
 --report renders the LATEST STORED scan — no re-scan, no baseline
 mutation — so reviewing a drift finding never destroys the evidence it
@@ -16,6 +16,7 @@ reuse the gate contract (0 pass / 1 breach / 2 operational). Read-only
 over the filesystem; never runs on the hook hot path.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -23,11 +24,9 @@ import re
 import time
 from pathlib import Path
 
-from . import __version__, hook, scanrules, store
+from . import hook, scanrules, store
 
 _SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
-_SARIF_LEVEL = {"critical": "error", "high": "error",
-                "medium": "warning", "low": "note", "info": "note"}
 _MAX_FILE = 1_000_000   # bytes; larger artifacts are inventoried, not read
 _MAX_FILES = 4000       # walk cap; overflow reports a nonzero skipped
                         # count (truncation flag, not an exact miss tally)
@@ -455,40 +454,6 @@ def to_json(meta, findings):
     return json.dumps({"meta": meta, "findings": findings}, indent=2) + "\n"
 
 
-def to_sarif(meta, findings):
-    """SARIF 2.1.0 — modeled on Cisco sarif_reporter.py (survey §2.4)."""
-    rules = [{"id": rid, "shortDescription": {"text": f"{cat}: {rid}"},
-              "defaultConfiguration": {"level": _SARIF_LEVEL[sev]}}
-             for rid, cat, sev, _, _ in scanrules.RULES]
-    for rid in ("secret_shape", "skill_undeclared_bash", "drift_added",
-                "drift_changed", "drift_removed"):
-        rules.append({"id": rid, "shortDescription": {"text": rid},
-                      "defaultConfiguration": {"level": "warning"}})
-    results = []
-    for f in findings:
-        if f.get("resolved"):
-            continue
-        results.append({
-            "ruleId": f["rule_id"],
-            "level": _SARIF_LEVEL.get(f["severity"], "note"),
-            "message": {"text": f"{f['rule_id']} in {f['artifact']}"
-                                f" ({f['category']})"},
-            "locations": [{"physicalLocation": {
-                "artifactLocation": {"uri": f["artifact"]},
-                "region": {"startLine": max(1, f["line"])}}}],
-            "fingerprints": {"primaryLocationLineHash": f["fingerprint"]},
-        })
-    doc = {"$schema": "https://raw.githubusercontent.com/oasis-tcs/"
-                      "sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-           "version": "2.1.0",
-           "runs": [{"tool": {"driver": {
-               "name": "llmsnitch", "version": __version__,
-               "informationUri": "https://localhost/llmsnitch",
-               "rules": rules}},
-               "results": results}]}
-    return json.dumps(doc, indent=2) + "\n"
-
-
 # -- CLI ---------------------------------------------------------------------
 
 def _load_latest_scan():
@@ -520,50 +485,35 @@ def _load_latest_scan():
     return None
 
 
+class _Parser(argparse.ArgumentParser):
+    """Bad arguments must return the operational exit code (2), never
+    SystemExit, and complain on `out` rather than stderr."""
+    def error(self, message):
+        raise ValueError(message)
+
+
 def cmd_scan(argv, out):
-    fmt, fail_on, roots, out_file = "text", "high", [], None
-    inventory = rebaseline = report = patrol_run = False
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a == "--format" and i + 1 < len(argv):
-            fmt = argv[i + 1]; i += 2
-        elif a == "--fail-on" and i + 1 < len(argv):
-            fail_on = argv[i + 1]; i += 2
-        elif a == "--out" and i + 1 < len(argv):
-            out_file = argv[i + 1]; i += 2
-        elif a == "--inventory":
-            inventory = True; i += 1
-        elif a == "--rebaseline":
-            rebaseline = True; i += 1
-        elif a == "--report":
-            report = True; i += 1
-        elif a == "--patrol":
-            patrol_run = True; i += 1
-        elif a.startswith("--"):
-            out.write(f"[ERROR] unknown flag: {a}\n")
-            return 2
-        else:
-            roots.append(a); i += 1
-    if fmt not in ("text", "json", "sarif") or fail_on not in _SEVERITY_RANK:
-        out.write("[ERROR] bad --format or --fail-on value\n")
+    p = _Parser(prog="llmsnitch scan", add_help=False)
+    p.add_argument("roots", nargs="*")
+    p.add_argument("--format", dest="fmt", default="text",
+                   choices=("text", "json"))
+    p.add_argument("--fail-on", dest="fail_on", default="high",
+                   choices=tuple(_SEVERITY_RANK))
+    p.add_argument("--rebaseline", action="store_true")
+    p.add_argument("--report", action="store_true")
+    p.add_argument("--patrol", dest="patrol_run", action="store_true")
+    try:
+        a = p.parse_args(argv)
+    except ValueError as e:
+        out.write(f"[ERROR] {e}\n")
         return 2
-    for r in roots:
+    for r in a.roots:
         if not Path(os.path.expanduser(r)).exists():
             out.write(f"[ERROR] no such root: {r}\n")
             return 2
 
-    if inventory:
-        targets, skipped = discover(roots or None)
-        for path, cls, agent in targets:
-            out.write(f"{cls:<17} {agent:<12} {_display(path)}\n")
-        out.write(f"{len(targets)} artifacts"
-                  + (f", {skipped} skipped (budget)" if skipped else "")
-                  + "\n")
-        return 0
-
-    if report:
-        if roots or rebaseline:
+    if a.report:
+        if a.roots or a.rebaseline:
             out.write("[ERROR] --report reads the stored scan — "
                       "drop ROOT/--rebaseline\n")
             return 2
@@ -573,17 +523,11 @@ def cmd_scan(argv, out):
             return 2
         meta, findings = loaded
     else:
-        meta, findings = run_scan(roots or None, rebaseline,
-                                  "patrol" if patrol_run else "manual")
-    text = {"text": to_text, "json": to_json, "sarif": to_sarif}[fmt](
-        meta, findings)
-    if out_file:
-        Path(out_file).write_text(text)
-        out.write(f"[OK] written to {out_file}\n")
-    else:
-        out.write(text)
+        meta, findings = run_scan(a.roots or None, a.rebaseline,
+                                  "patrol" if a.patrol_run else "manual")
+    out.write({"text": to_text, "json": to_json}[a.fmt](meta, findings))
 
-    threshold = _SEVERITY_RANK[fail_on]
+    threshold = _SEVERITY_RANK[a.fail_on]
     breach = any(not f.get("resolved")
                  and _SEVERITY_RANK.get(f["severity"], 0) >= threshold
                  for f in findings)

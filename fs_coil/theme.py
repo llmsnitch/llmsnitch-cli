@@ -1,6 +1,6 @@
 """ywizz-style theme (purple accent) — ANSI escapes, tree glyphs, plain
-wordmark, gradient, tag printers. Mirrors lib/ywizz/theme.sh +
-info.sh so CLI output looks the same as install.sh."""
+wordmark, tag printers. Mirrors lib/ywizz/theme.sh + info.sh so CLI output
+looks the same as install.sh."""
 
 import sys
 
@@ -8,9 +8,6 @@ import sys
 BANNER = "llmSnitch"
 
 TAGLINE = "    filesystem tripwire — guarding the path from Claude & Opencode"
-
-# Empty — no ASCII art. print_banner(show_head=True) becomes a no-op for the head.
-SNAKE_HEAD = ""
 
 # ---------------------------------------------------------------------------
 # ywizz-style theme (purple accent).
@@ -63,24 +60,9 @@ def head(title):
         print(f"== {title} ==")
 
 
-def _gradient(t):
-    if t <= 500:
-        s = t * 2
-        r = 155 + (255 - 155) * s // 1000
-        g = 89 + (140 - 89) * s // 1000
-        b = 255 + (0 - 255) * s // 1000
-    else:
-        s = (t - 500) * 2
-        r = 255
-        g = 140 + (105 - 140) * s // 1000
-        b = 0 + (180 - 0) * s // 1000
-    return f"\x1b[38;2;{r};{g};{b}m"
-
-
-def print_banner(show_head=False):
+def print_banner():
     if not sys.stdout.isatty():
         return
     reset = "\x1b[0m"
-    # show_head is retained for API compat but is now a no-op — no ASCII art.
     print(f"{_C7}{_BOLD}{BANNER}{reset}")
     print(f"\x1b[38;2;255;105;180m{TAGLINE}{reset}\n")

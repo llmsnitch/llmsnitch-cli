@@ -1,29 +1,33 @@
 """Activity-related render panes: the packed top-band (charts + top-lists),
-plus the standalone two-col / recent / timeline / rules / offenders panes
-exposed via the --section flag."""
+plus the standalone recent / timeline / rules / offenders panes exposed via
+the --section flag."""
 
 from fs_coil.classify import _short_sign
 from fs_coil.denylist import _shrink
 from fs_coil.network import _NET_SESSION
 from fs_coil.render_charts import _hourly_block, _timeline_block
-from fs_coil.render_core import _render_columns, _top_block, _two_col
+from fs_coil.render_core import _render_columns, _top_block
 from fs_coil.theme import (
     _BOLD, _C7, _DIM, _ORANGE, _R, _RED, _TREE_MID, _YELLOW, _tty, head, item,
 )
 
 
 def _render_offenders(d):
-    _two_col(
-        "top offenders", d["actors"].most_common(5),   lambda k: _shrink(k, d["home"]),
-        "top parents",   d["parents"].most_common(5),  lambda k: k or "?",
-    )
+    blocks = [_top_block(title, items.most_common(5), fmt)
+              for title, items, fmt in (
+                  ("top offenders", d["actors"],  lambda k: _shrink(k, d["home"])),
+                  ("top parents",   d["parents"], lambda k: k or "?"),
+              ) if items]
+    _render_columns(blocks)
 
 
 def _render_rules(d):
-    _two_col(
-        "top rules", d["patterns"].most_common(5), lambda k: k,
-        "top paths", d["paths"].most_common(5),    lambda k: _shrink(k, d["home"]),
-    )
+    blocks = [_top_block(title, items.most_common(5), fmt)
+              for title, items, fmt in (
+                  ("top rules", d["patterns"], lambda k: k),
+                  ("top paths", d["paths"],    lambda k: _shrink(k, d["home"])),
+              ) if items]
+    _render_columns(blocks)
 
 
 def _render_timeline(d):

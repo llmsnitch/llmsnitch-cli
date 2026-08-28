@@ -54,7 +54,7 @@ def _render_report_once(section=None, banner=True):
         return
 
     if banner:
-        print_banner(show_head=False)
+        print_banner()
 
     # Lead with the packed graphs + top-lists row (timeline · hourly ·
     # offenders · parents · rules · paths). This is the "dashboard" band

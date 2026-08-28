@@ -1,12 +1,11 @@
-"""Glob-to-regex compiler + path-noise/sensitive helpers. DENY_RULES lives in
-deny_rules.py and is re-exported here for backwards compatibility with callers
-that did `from fs_coil.denylist import DENY_RULES`."""
+"""Glob-to-regex compiler + path-noise/sensitive helpers. DENY_RULES (the
+rule table) lives in deny_rules.py; compile_deny below turns it into regexes."""
 
 import fnmatch
 import re
 
 from fs_coil.constants import NOISE_PATH_SUBSTRINGS, SENSITIVE_BASENAME_GLOBS
-from fs_coil.deny_rules import DENY_RULES  # re-export
+from fs_coil.deny_rules import DENY_RULES
 
 
 def glob_to_regex(pat, home):

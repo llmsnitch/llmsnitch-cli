@@ -52,6 +52,18 @@ def _light_paths_from_config():
     return DEFAULT_WATCH_PATHS
 
 
+def _opt(rest, flag, default=None, cast=str):
+    """Value following `--flag` in rest, or `default` (also on bad cast)."""
+    if flag in rest:
+        i = rest.index(flag)
+        if i + 1 < len(rest):
+            try:
+                return cast(rest[i + 1])
+            except ValueError:
+                pass
+    return default
+
+
 def main():
     argv = sys.argv[1:]
     first = argv[0] if argv else ""
@@ -65,30 +77,14 @@ def main():
         return
 
     c = argv[0]
+    rest = argv[1:]
     if c == "status":
         cmd_status()
     elif c == "report":
-        section = None
-        live = False
-        interval = 5
-        banner = True
-        rest = argv[1:]
-        if "--section" in rest:
-            i = rest.index("--section")
-            if i + 1 < len(rest):
-                section = rest[i + 1]
-        if "--live" in rest:
-            live = True
-        if "--interval" in rest:
-            i = rest.index("--interval")
-            if i + 1 < len(rest):
-                try:
-                    interval = max(1, int(rest[i + 1]))
-                except ValueError:
-                    pass
-        if "--no-banner" in rest:
-            banner = False
-        cmd_report(section=section, live=live, interval=interval, banner=banner)
+        cmd_report(section=_opt(rest, "--section"),
+                   live=("--live" in rest),
+                   interval=max(1, _opt(rest, "--interval", 5, int)),
+                   banner=("--no-banner" not in rest))
     elif c == "dashboard":
         cmd_dashboard()
     elif c == "start":
@@ -100,32 +96,10 @@ def main():
     elif c == "logs":
         cmd_logs(follow=("-f" in argv[1:]))
     elif c == "noise":
-        rest = argv[1:]
-        category = None
-        days = 1
-        if "--category" in rest:
-            i = rest.index("--category")
-            if i + 1 < len(rest):
-                category = rest[i + 1]
-        if "--days" in rest:
-            i = rest.index("--days")
-            if i + 1 < len(rest):
-                try:
-                    days = max(1, int(rest[i + 1]))
-                except ValueError:
-                    pass
-        cmd_noise(category=category, days=days)
+        cmd_noise(category=_opt(rest, "--category"),
+                  days=max(1, _opt(rest, "--days", 1, int)))
     elif c == "prune":
-        days = 30
-        rest = argv[1:]
-        if "--days" in rest:
-            i = rest.index("--days")
-            if i + 1 < len(rest):
-                try:
-                    days = max(1, int(rest[i + 1]))
-                except ValueError:
-                    pass
-        cmd_prune(days=days)
+        cmd_prune(days=max(1, _opt(rest, "--days", 30, int)))
     elif c == "test":
         cmd_test()
     elif c == "daemon":

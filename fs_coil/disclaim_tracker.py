@@ -97,12 +97,3 @@ def is_claude_descendant(pid):
     verdict = _ancestor_is_claude(pid)
     _CACHE[pid] = (verdict, now)
     return verdict
-
-
-def cleanup_cache():
-    """Drop stale cache entries. Optional periodic call to keep memory
-    bounded when the daemon is long-running."""
-    now = time.time()
-    stale = [p for p, (_, ts) in _CACHE.items() if now - ts > CACHE_TTL_SECS]
-    for p in stale:
-        _CACHE.pop(p, None)

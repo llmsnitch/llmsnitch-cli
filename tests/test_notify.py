@@ -4,59 +4,18 @@
 Run: python3 tests/test_notify.py
 """
 
-import json
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from fs_coil import agent_registry, notify as nf  # noqa: E402
+from fs_coil import notify as nf  # noqa: E402
+from tests._seams import with_tmp as _with_tmp, rows as _rows, state as _state, run  # noqa: E402
 
 T0 = 1_755_600_000.0   # fixed epoch base for the injectable clock
-
-
-def _env(t):
-    return {"LLMSNITCH_NOTIFY_DIR": str(t / "notify"),
-            "LLMSNITCH_HOT_STATE": str(t / "cache" / "notify-state.json"),
-            "LLMSNITCH_CONFIG": str(t / "config.ini")}
-
-
-def _with_tmp(fn, config=""):
-    """Tmp dirs + env seams + no-banner _deliver stub + captured NOTIFIER-ERROR."""
-    with tempfile.TemporaryDirectory() as td:
-        t = Path(td)
-        (t / "cache").mkdir()
-        (t / "config.ini").write_text(config or "[notify]\ncold_start = 0\n")
-        old_env = {k: os.environ.get(k) for k in _env(t)}
-        os.environ.update(_env(t))
-        delivered, errors = [], []
-        old_deliver, old_log = nf._deliver, nf._log_error
-        nf._deliver = lambda *a, **k: delivered.append(a)
-        nf._log_error = errors.append
-        try:
-            fn(t, delivered, errors)
-        finally:
-            nf._deliver, nf._log_error = old_deliver, old_log
-            for k, v in old_env.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-
-
-def _rows(t):
-    out = []
-    for f in sorted((t / "notify").glob("events-*.ndjson")):
-        out += [json.loads(l) for l in f.read_text().splitlines()]
-    return out
-
-
-def _state(t):
-    return json.loads((t / "cache" / "notify-state.json").read_text())
 
 
 def test_parse_window():
@@ -242,7 +201,7 @@ def test_concurrent_append_rows_stay_intact():
         script.write_text(f"""
 import json, os, sys
 sys.path.insert(0, {str(_ROOT)!r})
-for k in {list(_env(t).items())!r}:
+for k in {[(k, os.environ[k]) for k in ("LLMSNITCH_NOTIFY_DIR", "LLMSNITCH_HOT_STATE", "LLMSNITCH_CONFIG")]!r}:
     os.environ[k[0]] = k[1]
 from fs_coil import notify as nf
 tag = sys.argv[1]
@@ -256,79 +215,6 @@ for i in range(500):
         rows = _rows(t)
         assert len(rows) == 1000, len(rows)          # every row parsed intact
         assert sum(1 for r in rows if r["tag"] == "a") == 500
-    _with_tmp(body)
-
-
-def test_registry_invalid_agent_name_rejected():
-    cfg = "[agent.bad@name]\npaths = ~/.bad\n[agent.goodname]\npaths = ~/.good\n"
-    def body(t, delivered, errors):
-        logged = []
-        reg = agent_registry.load_registry(log=logged.append)
-        assert "bad@name" not in reg
-        assert "goodname" in reg
-        assert logged and "invalid agent name" in logged[0]
-    _with_tmp(body, config=cfg)
-
-
-def test_registry_merge_replaces_listed_keeps_unlisted():
-    cfg = "[agent.claude-code]\nexes = claude-custom\n"
-    def body(t, delivered, errors):
-        reg = agent_registry.load_registry()
-        assert reg["claude-code"]["exes"] == ["claude-custom"]        # replaced
-        assert reg["claude-code"]["paths"] == ["~/.claude", "~/.claude.json"]  # kept
-    _with_tmp(body, config=cfg)
-
-
-def test_attribute_actor_branches():
-    def body(t, delivered, errors):
-        reg = agent_registry.load_registry()
-        # signing id wins over exe, path never consulted with pinfo present
-        b, raw = agent_registry.attribute_actor(
-            path=os.path.expanduser("~/.codex/x"),
-            pinfo={"exe": "/usr/bin/mystery", "sign": "com.anthropic.claude"},
-            registry=reg)
-        assert b == "claude-code" and raw == "/usr/bin/mystery"
-        # exe basename
-        b, _ = agent_registry.attribute_actor(
-            pinfo={"exe": "/opt/x/codex"}, registry=reg)
-        assert b == "codex"
-        # known tool normalization
-        b, _ = agent_registry.attribute_actor(
-            pinfo={"exe": "/opt/homebrew/bin/python3.14"}, registry=reg)
-        assert b == "python"
-        b, _ = agent_registry.attribute_actor(
-            pinfo={"exe": "/usr/local/bin/mystery"}, registry=reg)
-        assert b == "unknown"
-        # light mode: territory only
-        b, raw = agent_registry.attribute_actor(
-            path=os.path.expanduser("~/.claude/settings.json"), registry=reg)
-        assert b == "claude-code" and raw is None
-        b, _ = agent_registry.attribute_actor(
-            path=os.path.expanduser("~/.ssh/config"), registry=reg)
-        assert b == "unknown"
-    _with_tmp(body)
-
-
-def test_classify_event_table():
-    def body(t, delivered, errors):
-        reg = agent_registry.load_registry()
-        home = os.path.expanduser("~")
-        # row 1: outside any territory
-        assert agent_registry.classify_event(
-            home + "/.ssh/config", "W", "unknown", reg) == ("deny_write", None)
-        assert agent_registry.classify_event(
-            home + "/.ssh/config", "R", "unknown", reg) == ("deny_read", None)
-        # row 2: own territory — self vs cache
-        assert agent_registry.classify_event(
-            home + "/.claude/settings.json", "W", "claude-code", reg) == ("agent_self", None)
-        assert agent_registry.classify_event(
-            home + "/.claude/plugins/cache/x/y", "W", "claude-code", reg) == ("agent_plugin_cache", None)
-        # row 3: registered agent in ANOTHER agent's territory → mismatch
-        assert agent_registry.classify_event(
-            home + "/.claude/settings.json", "W", "codex", reg) == ("deny_write", "claude-code")
-        # row 4: non-agent bucket inside territory
-        assert agent_registry.classify_event(
-            home + "/.claude/settings.json", "W", "bash", reg) == ("deny_write", None)
     _with_tmp(body)
 
 
@@ -347,24 +233,5 @@ def test_actor_mismatch_is_critical_and_respects_window():
     _with_tmp(body)
 
 
-def main():
-    tests = sorted((v for k, v in globals().items()
-                    if k.startswith("test_") and callable(v)),
-                   key=lambda f: f.__name__)
-    failed = 0
-    for t in tests:
-        try:
-            t()
-            print(f"PASS {t.__name__}")
-        except AssertionError as e:
-            failed += 1
-            print(f"FAIL {t.__name__}: {e}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"ERROR {t.__name__}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-    sys.exit(1 if failed else 0)
-
-
 if __name__ == "__main__":
-    main()
+    sys.exit(run(globals()))

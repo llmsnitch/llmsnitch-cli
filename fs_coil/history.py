@@ -3,8 +3,7 @@
 _STATS_HISTORY  — per-metric deques feeding the live sparklines.
 _ACTOR_LAST_SEEN — per-bucket datetime of last running observation, so a row
 stays visible for ≤ 1 hour after the process disappears.
-_sparkline / _vbar_chart — compact block-character renderers used by
-render_sidebar.
+_sparkline — compact block-character renderer.
 """
 
 from collections import deque
@@ -49,35 +48,3 @@ def _sparkline(values, max_val=None):
     return "".join(out)
 
 
-def _vbar_chart(values, height=3, max_val=None, color=None):
-    """Vertical bar chart of `height` rows. Each value = one column; partial
-    fills use the 8-step vertical-block ramp. Returns the rendered rows
-    top → bottom. Reused by cpu/mem/net panes."""
-    if color is None:
-        color = _ORANGE
-    ramp = "▁▂▃▄▅▆▇█"
-    if not values:
-        return [""] * height
-    hi = max_val if max_val is not None else max(values, default=1)
-    hi = hi if hi and hi > 0 else 1
-
-    eighths = []
-    for v in values:
-        if v is None or v <= 0:
-            eighths.append(0)
-        else:
-            eighths.append(max(1, int(round((v / hi) * height * 8))))
-
-    rows = []
-    for row in range(height - 1, -1, -1):
-        cells = []
-        for h in eighths:
-            remaining = h - row * 8
-            if remaining >= 8:
-                cells.append(f"{color}█{_R}")
-            elif remaining > 0:
-                cells.append(f"{color}{ramp[remaining - 1]}{_R}")
-            else:
-                cells.append(f"{_DIM}·{_R}")
-        rows.append("".join(cells))
-    return rows

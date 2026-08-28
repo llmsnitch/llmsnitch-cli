@@ -73,8 +73,5 @@ def _icns_to_png(icns, out):
 
 
 def _find_notifier():
-    for p in ("/opt/homebrew/bin/terminal-notifier",
-              "/usr/local/bin/terminal-notifier"):
-        if os.path.exists(p):
-            return p
-    return None
+    from fs_coil.constants import TERMINAL_NOTIFIER
+    return TERMINAL_NOTIFIER if os.path.exists(TERMINAL_NOTIFIER) else None

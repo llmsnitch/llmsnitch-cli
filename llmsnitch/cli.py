@@ -67,11 +67,9 @@ def cmd_show(sid, out):
     if s.get("signals_partial"):   # honest degradation (contract C4)
         out.write(f"health    partial — {s['signals_partial']}\n")
     if s.get("cost_usd") is not None:
-        cfg = gate.load_cfg()
-        subscription = cfg["billing_mode"] == "subscription"
+        subscription = gate.load_cfg()["billing_mode"] == "subscription"
         prefix = "est.cost" if subscription else "cost    "
-        tilde = "~" if subscription else ""
-        out.write(f"{prefix}  {tilde}${s['cost_usd']:.4f} "
+        out.write(f"{prefix}  {_cost_label(s['cost_usd'], subscription)} "
                   f"({s.get('total_tokens', 0)} tokens)"
                   + (" — subscription plans not billed this\n"
                      if subscription else "\n"))

@@ -49,11 +49,7 @@ def _report_data():
         return sum(1 for x in src if (now - x["dt"]).total_seconds() <= sec)
     h1, d1, d7 = _within(matches, 3600), _within(matches, 86400), len(matches)
     # Separate audit (severity=low) windowed counters.
-    audit_h1, audit_d1, audit_d7 = (
-        _within(audit_match, 3600),
-        _within(audit_match, 86400),
-        len(audit_match),
-    )
+    audit_h1, audit_d7 = _within(audit_match, 3600), len(audit_match)
 
     actors   = Counter((m.get("via") or m["proc"]) for m in matches)
     patterns = Counter(m["pattern"] for m in matches)
@@ -108,7 +104,7 @@ def _report_data():
         "rt": rt,
         "r_cnt": r_cnt, "w_cnt": w_cnt, "rw_cnt": rw_cnt, "total": total,
         "h1": h1, "d1": d1, "d7": d7,
-        "audit_h1": audit_h1, "audit_d1": audit_d1, "audit_d7": audit_d7,
+        "audit_h1": audit_h1, "audit_d7": audit_d7,
         "actors": actors, "patterns": patterns, "paths": paths, "parents": parents,
         "sources": sources, "signs": signs, "actor_identity": actor_identity,
         "daemon_n": daemon_n, "interactive_n": interactive_n,
@@ -119,6 +115,6 @@ def _report_data():
         "fda_inferred": fda_inferred, "log_writable": log_writable,
         "hits_per_day":  _hits_per_day(matches, 7),
         "hits_per_hour": _hits_per_hour(matches, 24),
-        "execs": execs, "execs_1h": execs_1h, "execs_24h": execs_24h,
+        "execs_1h": execs_1h, "execs_24h": execs_24h,
         "execs_7d": execs_7d, "execs_total_1h": execs_total_1h,
     }

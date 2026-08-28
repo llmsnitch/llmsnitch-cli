@@ -177,29 +177,4 @@ def cmd_dashboard():
     _run(["tmux", "resize-pane", "-t", p_logs,  "-y", str(logs_h)])
     _run(["tmux", "resize-pane", "-t", p_llm,   "-y", str(llm_h)])
 
-    # Unconditional debug dump to a FILE (not stderr — attach-session
-    # takes over the terminal before stderr flushes). Tells us exactly
-    # what tmux did with our splits + resizes, so the next round of
-    # "it's still wrong" can be diagnosed without guesswork.
-    dbg_path = Path.home() / ".fs-coil-dashboard.log"
-    try:
-        dbg = _run(["tmux", "list-panes", "-t", session,
-                    "-F", "#{pane_id} #{pane_width}x#{pane_height} "
-                          "@(#{pane_left},#{pane_top})"])
-        with open(dbg_path, "w") as fp:
-            fp.write(
-                f"term          : {total_cols}x{total_rows}\n"
-                f"target widths : report={report_w} mid={mid_w} right={right_w}\n"
-                f"target heights: logs={logs_h} llm={llm_h}\n"
-                f"pane ids      : left={p_left} mid={p_mid} right={p_right} "
-                f"logs={p_logs} llm={p_llm}\n"
-                f"--- actual panes (tmux list-panes) ---\n{dbg.stdout}"
-            )
-    except Exception as e:
-        # Don't block the dashboard on a debug-write error.
-        try:
-            open(dbg_path, "w").write(f"debug write failed: {e}\n")
-        except Exception:
-            pass
-
     subprocess.run(["tmux", "attach-session", "-t", session])

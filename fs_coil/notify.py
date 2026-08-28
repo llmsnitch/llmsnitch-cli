@@ -9,7 +9,7 @@ Library only — no callers are wired until T005/T006. Stdlib only.
 Test seams (production never sets them):
   LLMSNITCH_NOTIFY_DIR — ledger/digest directory
   LLMSNITCH_HOT_STATE  — hot-state JSON path
-  LLMSNITCH_CONFIG     — INI path (shared with agent_registry)
+  LLMSNITCH_CONFIG     — INI path
 """
 
 import configparser
