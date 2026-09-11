@@ -4,7 +4,39 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T503`
-`status: CLAIMED (research subagent, 2026-09-11)`
+`status: DONE (2026-09-11)`
+
+## Resolution
+
+Findings: [docs/research/dep-audit-stdlib-matching.md](../../../docs/research/dep-audit-stdlib-matching.md)
+(cited, primary sources, measured against the live OSV PyPI corpus).
+
+**Verdict (Q3, load-bearing): the bulletin carries pre-chewed enumerated
+affected versions per (ecosystem, package) plus an `all_versions: true`
+boolean — not ranges.** Client needs zero PEP 440 comparison: PEP 503 name
+normalization (one regex), a ~30-line version canonicalizer, strip
+`+local`, set membership. Clinchers:
+
+1. OSV already pre-chews server-side — enumerated versions present in 77%
+   of the 30,615 PyPI affected-blocks; osv-scanner's offline matcher
+   checks that array by string equality first; pip-audit does no
+   client-side matching at all.
+2. Bounded: median 11 affected versions per block, p95 243, max 2,458.
+   The ranges-only remainder is ~90% MAL "all versions affected" → the
+   `all_versions` boolean; the server enumerates the few hundred real
+   stragglers via PyPI JSON API.
+3. PEP 440 corner cases: epochs appear zero times in the corpus;
+   pre/post/dev bounds (~2,300 range events — where naive comparison
+   breaks) are sidestepped entirely by membership; locals occur on the
+   *installed* side (torch `+cuXXX`) → client strips `+local` first.
+4. `importlib.metadata.distributions(path=[…])` verified live against
+   foreign envs (incl. `.venv-dashboard`, a 3.12 venv read from 3.14, the
+   uv tool env): pure filesystem parsing, in stdlib since 3.9. Use
+   `dist.metadata['Name']` (then PEP 503-normalize) + `dist.version`.
+
+Multi-ecosystem holds: membership is ecosystem-agnostic; only the
+server-side enumerator is per-ecosystem. Ranges at most as provenance
+metadata the client never evaluates.
 
 ## Question
 

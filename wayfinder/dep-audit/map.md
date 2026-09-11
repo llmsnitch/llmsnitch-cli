@@ -55,6 +55,12 @@ produces bulletins is explicitly not built here. The map closes when
   `open_ended` marker; indicator fog confirmed; **new**: 46% of PyPI
   corpus is malicious-package (MAL) records → bulletin needs a
   `vulnerability|malicious` class (feeds T503/T505).
+- [T502 — Client-side matching with stdlib only](tickets/T502-stdlib-matching.md) —
+  bulletin carries **pre-chewed enumerated affected versions +
+  `all_versions` boolean, not ranges**; client = PEP 503 normalize +
+  canonicalize + strip `+local` + set membership (zero PEP 440
+  comparison); `importlib.metadata.distributions(path=…)` reads foreign
+  envs from one interpreter (verified live, stdlib 3.9+).
 
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
