@@ -62,6 +62,14 @@ produces bulletins is explicitly not built here. The map closes when
   comparison); `importlib.metadata.distributions(path=…)` reads foreign
   envs from one interpreter (verified live, stdlib 3.9+).
 
+- [T503 — Bulletin schema contract v1](tickets/T503-bulletin-schema.md) —
+  `docs/bulletin-spec.md` published: single JSON `{meta, entries[]}`, gzip +
+  sidecar `.sha256` (integrity only, signing = v2 fog); full-ecosystem only
+  (intake list never leaves the machine); one entry per (advisory-group ×
+  package), `id` = CVE-first, waivers match `{id} ∪ aliases`; re-raise on
+  severity-band escalation or `kev.listed` flip, never EPSS; `all_versions`
+  boolean (no `open_ended`), withdrawn dropped, `fixed_in`/`summary`/`url`
+  display-only.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with
@@ -86,6 +94,9 @@ produces bulletins is explicitly not built here. The map closes when
   per ecosystem graduate one at a time, npm likely first.
 - **fs-coil site-packages attribution** — filesystem-write evidence as a
   secondary intake source for installs the ledger grammar misses.
+- **Bulletin authenticity (signing)** — the sidecar hash is integrity-only;
+  a signed manifest with real key management is the v2 candidate once a real
+  provider exists (T503, spec's "Out of contract" list).
 - **Bulletin staleness alerting** — "no refresh in >2 weeks" is invisible
   until an outlet exists; same problem as patrol staleness (scan-rollout
   fog), likely graduates together.
