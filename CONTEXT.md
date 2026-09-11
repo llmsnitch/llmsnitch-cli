@@ -9,7 +9,7 @@ these words.
 
 **Surface**:
 An alert-producing subsystem: `fs-coil-light`, `fs-coil-deep`,
-`config-audit`, or a future watcher. (The `session-shed` / `agent-flick`
+`config-audit`, `dep-audit`, or a future watcher. (The `session-shed` / `agent-flick`
 wrapper surfaces were retired 2026-08-27 — `wayfinder/rd-triage/map.md`.)
 _Avoid_: source, channel, tool
 
@@ -144,3 +144,21 @@ The roster gate: a harness is adapter-eligible iff it writes local
 trace/session files on disk; cloud-only harnesses fall to the companion
 browser extension.
 _Avoid_: eligibility check, filter
+
+**Bulletin**:
+The distilled advisory payload a provider publishes and the CLI consumes:
+per-ecosystem package/version entries with severity and exploited-evidence
+flags, cached locally and refreshed weekly.
+_Avoid_: feed, CVE database, advisory list
+
+**Intake**:
+The evidence record that a specific package entered the machine through an
+agent session — the population the `dep-audit` surface watches. Merely
+being installed is not an intake; agent provenance is.
+_Avoid_: install event, dependency (ambiguous), provenance (taken)
+
+**Waiver**:
+A user-granted exception silencing a specific dep-audit finding
+(advisory × package), carrying a reason, living until removed or the
+advisory's severity escalates.
+_Avoid_: exception, allowlist entry, suppression
