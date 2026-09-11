@@ -17,3 +17,10 @@ exploited-evidence flag the criticality gate needs, optional indicator
 slots (fog placeholder), bulletin metadata (issued-at, hash for
 verification, staleness stamping). HITL grilling: format (JSON? NDJSON?),
 size budget, versioning of the contract itself.
+
+From T501: severity must be optional (`{label, vectors[], source}`) and
+never load-bearing; exploited-evidence = `kev:{…}` + `epss:{…}` as two
+fields, never merged; `versions:[]` + `open_ended` marker; and a
+`class: vulnerability|malicious` discriminator — MAL records (46% of the
+PyPI corpus) have no severity/fix/CVE yet are the most page-worthy for an
+agent-installed population.

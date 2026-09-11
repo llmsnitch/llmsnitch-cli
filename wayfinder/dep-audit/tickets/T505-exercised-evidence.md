@@ -21,3 +21,7 @@ ledger evidence only (no runtime instrumentation):
    (quiet) finding — is that acceptable, or does "installed + exploited
    flag, exercise unknown" deserve a middle tier?
 4. Once resolved, "Exercised" enters CONTEXT.md as canon.
+
+From T501: does the `malicious` class bypass this gate entirely? A
+typosquat an agent installed is arguably critical on install alone —
+"exercised" may only be the gate for the `vulnerability` class.

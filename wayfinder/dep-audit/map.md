@@ -48,6 +48,14 @@ produces bulletins is explicitly not built here. The map closes when
 
 <!-- one line per closed ticket: gist + link -->
 
+- [T501 — Advisory-source survey](tickets/T501-advisory-source-survey.md) —
+  OSV is the sole aggregation point (all four ecosystems, no-auth bulk);
+  exploited = KEV evidence + EPSS forecast as separate fields; severity
+  optional and never a gate; exact-version lists viable with an
+  `open_ended` marker; indicator fog confirmed; **new**: 46% of PyPI
+  corpus is malicious-package (MAL) records → bulletin needs a
+  `vulnerability|malicious` class (feeds T503/T505).
+
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with
