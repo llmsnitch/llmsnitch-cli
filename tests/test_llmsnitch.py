@@ -298,6 +298,110 @@ def test_scan_walk_budget_overflow_is_counted():
     _with_tmp_store(body)
 
 
+def test_unattested_home_high_on_patrol():
+    """A dot-dir with a session ledger outside every territory is an
+    unattested agent home — high on a patrol (plan 011 D2)."""
+    from llmsnitch import scan
+    def body(t):
+        d = t / "home" / ".faketool" / "sessions"
+        d.mkdir(parents=True)
+        (d / "s.jsonl").write_text('{"x": 1}\n')
+        fnds = scan.discover_unattested("scan-x", "patrol",
+                                        roots=[str(t / "home")])
+        assert len(fnds) == 1, fnds
+        f = fnds[0]
+        assert f["rule_id"] == "unattested_agent_home"
+        assert f["severity"] == "high"
+        assert f["category"] == "unattested_agent"
+        assert f["agent"] == "unknown"
+    _with_tmp_store(body)
+
+
+def test_unattested_worktree_low_on_manual():
+    """Same home, manual trigger, non-system root → the low hygiene tier
+    with its own rule_id (distinct fingerprint; plan 011 D2)."""
+    from llmsnitch import scan
+    def body(t):
+        d = t / "home" / ".faketool" / "sessions"
+        d.mkdir(parents=True)
+        (d / "s.jsonl").write_text('{"x": 1}\n')
+        fnds = scan.discover_unattested("scan-x", "manual",
+                                        roots=[str(t / "home")])
+        assert len(fnds) == 1, fnds
+        f = fnds[0]
+        assert f["rule_id"] == "unattested_agent_worktree"
+        assert f["severity"] == "low"
+        assert f["category"] == "scan_hygiene"
+    _with_tmp_store(body)
+
+
+def test_known_territory_not_flagged():
+    """A signal inside a registered territory is not unattested — the
+    _agent_bucket skip must hold (plan 011 maintenance note)."""
+    from llmsnitch import scan
+    def body(t):
+        (t / ".claude").mkdir()
+        (t / ".claude" / "SKILL.md").write_text("---\nname: x\n---\nhi\n")
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(t)   # territories resolve via expanduser
+        try:
+            fnds = scan.discover_unattested("scan-x", "patrol",
+                                            roots=[str(t)])
+        finally:
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+        assert fnds == [], fnds
+    _with_tmp_store(body)
+
+
+def test_generic_dotdirs_no_false_positive():
+    """Ordinary dot-dirs never trip discovery: ~/.ssh, ~/.config (nested
+    config.toml), ~/.docker, and a vim sessions dir holding only .vim
+    files (the live FP that forced the JSON-ledger tightening)."""
+    from llmsnitch import scan
+    def body(t):
+        h = t / "home"
+        (h / ".ssh").mkdir(parents=True)
+        (h / ".ssh" / "config").write_text("Host *\n")
+        (h / ".config" / "foo").mkdir(parents=True)
+        (h / ".config" / "foo" / "config.toml").write_text("[x]\n")
+        (h / ".docker").mkdir()
+        (h / ".docker" / "config.json").write_text("{}\n")
+        (h / ".vim" / "sessions").mkdir(parents=True)
+        (h / ".vim" / "sessions" / "proj.vim").write_text("let v = 1\n")
+        for trigger in ("patrol", "manual"):
+            fnds = scan.discover_unattested("scan-x", trigger,
+                                            roots=[str(h)])
+            assert fnds == [], (trigger, fnds)
+    _with_tmp_store(body)
+
+
+def test_signal_detection_shallow_only():
+    """Signals count at depth 1 only — nested markers never trip
+    (plan 011 D4 discipline)."""
+    from llmsnitch import scan
+    def body(t):
+        h = t / "home"
+        sub = h / ".tool" / "sub"
+        sub.mkdir(parents=True)
+        (sub / "config.toml").write_text("[x]\n")
+        (sub / "mcp.json").write_text("{}\n")
+        fnds = scan.discover_unattested("scan-x", "patrol", roots=[str(h)])
+        assert fnds == [], fnds
+    _with_tmp_store(body)
+
+
+def test_ruleset_sha_deterministic_and_changed():
+    """The reproducibility stamp covers the discovery detector: stable
+    within a build, changed from the pre-011 ruleset."""
+    from llmsnitch import scanrules
+    pre_011 = "2af2b7ef48837f5c704e605c0770a2851b984ebe43a12d123aba4b0bbefee8ea"
+    assert scanrules.ruleset_sha256() == scanrules.ruleset_sha256()
+    assert scanrules.ruleset_sha256() != pre_011
+
+
 def test_scan_rules_resist_redos():
     """A crafted long line must not hang the ruleset (measured pre-fix:
     42s for 200KB of 'curl '; budget here is generous CI headroom)."""

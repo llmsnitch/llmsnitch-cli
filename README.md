@@ -61,7 +61,16 @@ max_tool_fail_rate = 15    # percent
 health_floor = 70          # health = max(0, 100 - 3*errors - fail_rate)
 range = latest             # latest | today | all
 billing_mode = subscription  # subscription | per_token
+
+[scan]
+discover_roots = ~:~/Library/Application Support
 ```
+
+**`discover_roots`** — colon-separated roots (PATH convention) whose
+top-level directories the scan probes for un-dossiered agent homes; default
+`~` (under `$HOME`, dot-dirs only). Widening coverage toward new install
+locations — e.g. the scanner survey's snyk table (§2.2) — is exactly this
+key, no code change.
 
 Cost comes from the Claude Code transcript's own `usage` records, priced by
 the table in `transcript.py` — an offline estimate you can edit, not a
