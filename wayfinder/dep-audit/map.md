@@ -32,9 +32,8 @@ produces bulletins is explicitly not built here. The map closes when
   import-clean (ADR 0001).
 - **Research policy**: research agents use `curl`, never WebFetch/WebSearch
   (user global rule); findings land in `docs/research/` per precedent.
-- **Vocabulary**: **Bulletin**, **Intake**, **Waiver** are canon
-  (CONTEXT.md, added at charting). "Exercised" is *not* yet canon — T505
-  defines it.
+- **Vocabulary**: **Bulletin**, **Intake**, **Waiver** (charting) and
+  **Exercised** (T505) are canon in CONTEXT.md.
 - **Grounding doctrine**: every page passes AGENTS.md Decision/Actor/Novelty.
   The criticality model is evidence-centric, not advisory-centric: an
   advisory label alone never pages.
@@ -84,6 +83,12 @@ produces bulletins is explicitly not built here. The map closes when
   malicious, 21 KEV-listed, 1.1 MB gz); manual weekly re-run is the provider
   stand-in; ticket's "this machine's 9 envs" scope superseded by T503's
   full-ecosystem rule.
+- [T505 — "Exercised" evidence](tickets/T505-exercised-evidence.md) —
+  exercised = source-import scan ∨ project-ran-after-install (bytecode
+  evidence dropped: installer-dependent); binary tiers, no middle;
+  **malicious ∧ intake pages critical immediately, bypassing the gate**;
+  full predicate: `critical = (malicious ∧ intake) ∨ (intake ∧ kev.listed
+  ∧ exercised)`; "Exercised" now canon in CONTEXT.md.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with

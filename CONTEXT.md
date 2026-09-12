@@ -157,6 +157,13 @@ agent session — the population the `dep-audit` surface watches. Merely
 being installed is not an intake; agent provenance is.
 _Avoid_: install event, dependency (ambiguous), provenance (taken)
 
+**Exercised**:
+A package with machine-local evidence of use after intake: project source
+imports it, or the project ran in an agent session after the install. The
+gate that promotes an exploited-vulnerability finding to critical;
+`malicious` findings never wait for it.
+_Avoid_: reachable, invoked, used (vague)
+
 **Waiver**:
 A user-granted exception silencing a specific dep-audit finding
 (advisory × package), carrying a reason, living until removed or the
