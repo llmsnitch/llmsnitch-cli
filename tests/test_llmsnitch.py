@@ -785,6 +785,117 @@ def test_cost_note_shown_in_show():
     with_tmp(body, store=True)
 
 
+def test_cli_main_dispatch():
+    """main() routing: --version -> 0, bare invocation -> help text rc 0,
+    unknown command -> help text rc 2."""
+    import contextlib
+    from llmsnitch import cli
+    def body(t):
+        def call(argv):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cli.main(argv)
+            return rc, buf.getvalue()
+        rc, text = call(["--version"])
+        assert rc == 0 and "llmsnitch" in text, text
+        rc, text = call([])
+        assert rc == 0 and "llmsnitch CLI" in text, text
+        rc, text = call(["frobnicate"])
+        assert rc == 2, rc
+    _with_tmp_store(body)
+
+
+def test_scan_walk_skips_junk_and_depth():
+    """discover() prunes _SKIP_DIRS and dot-dirs and stops at _MAX_DEPTH:
+    only the plain-dir artifact within depth survives."""
+    from llmsnitch import scan
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        for rel in ("node_modules", ".git", "a/b/c/d/e/f/g", "keep"):
+            d = root / rel
+            d.mkdir(parents=True)
+            (d / "CLAUDE.md").write_text("# x\n")
+        targets, _ = scan.discover([str(root)])
+        paths = [str(p) for p, _, _ in targets]
+        assert len(paths) == 1, paths
+        assert paths[0].endswith(os.path.join("keep", "CLAUDE.md")), paths
+        for junk in ("node_modules", os.path.join(td, ".git"),
+                     os.path.join("f", "g")):
+            assert not any(junk in p for p in paths), (junk, paths)
+
+
+def test_patrol_write_default_path_and_launchctl():
+    """--write with no seam path takes the default branch: HOME-anchored
+    plist + log dir, bootout then bootstrap; bootstrap rc!=0 exits 2."""
+    import types
+    from llmsnitch import patrol
+    with tempfile.TemporaryDirectory() as td:
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = td
+        calls = []
+        boot_rc = {"bootstrap": 0}
+        def recorder(args, **kw):
+            calls.append(args[1])
+            code = boot_rc["bootstrap"] if args[1] == "bootstrap" else 0
+            return types.SimpleNamespace(returncode=code, stdout="", stderr="")
+        old_run = patrol.subprocess.run
+        patrol.subprocess.run = recorder
+        try:
+            assert patrol.run(True, io.StringIO()) == 0
+            plist = (Path(td) / "Library" / "LaunchAgents"
+                     / f"{patrol.LABEL}.plist")
+            assert plist.is_file(), "HOME override must redirect expanduser"
+            assert (Path(td) / "Library" / "Logs" / "llmsnitch").is_dir()
+            assert calls == ["bootout", "bootstrap"], calls
+            boot_rc["bootstrap"] = 1
+            assert patrol.run(True, io.StringIO()) == 2
+        finally:
+            patrol.subprocess.run = old_run
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+
+
+def test_ingest_skips_alien_ledger():
+    """A rollout file with neither a session_meta id nor any model parses to
+    None: no session written, cursor still recorded, second sweep skips it."""
+    from llmsnitch import harness, ingest
+    def body(t):
+        led = t / "ledger"
+        led.mkdir()
+        alien = led / "rollout-alien.jsonl"
+        alien.write_text(
+            '{"timestamp":"2026-08-20T10:00:00.000Z","type":"event_msg",'
+            '"payload":{"type":"agent_message","message":"hi"}}\n'
+            '{"note":"valid json, but no payload at all"}\n')
+        old = harness.HARNESSES["codex"]["session_paths"]
+        harness.HARNESSES["codex"]["session_paths"] = [str(led / "rollout-*.jsonl")]
+        try:
+            assert ingest.sweep() == 0
+            sess = t / "sessions"
+            assert not (sess.is_dir() and list(sess.glob("codex-*")))
+            state = json.loads((t / "ingest-state.json").read_text())
+            assert str(alien) in state, "cursor must be recorded"
+            assert ingest.sweep() == 0
+        finally:
+            harness.HARNESSES["codex"]["session_paths"] = old
+    _with_tmp_store(body)
+
+
+def test_secret_pattern_composition():
+    """Pins the hook._SECRET-inside-scan._SECRET_ALL embedding: everything
+    _SECRET matches at a non-alnum left edge, _SECRET_ALL must also match."""
+    from llmsnitch import scan
+    from llmsnitch.hook import _SECRET
+    for canary in ("sk-abcdefgh1234", "ghp_abcdefghij12",
+                   "xoxb-1234567890-ab", "AKIAABCDEFGHIJKLMNOP",
+                   "eyJ" + "a" * 40, "Bearer " + "a" * 20,
+                   "-----BEGIN RSA PRIVATE KEY-----"):
+        assert _SECRET.search(canary), canary
+        assert scan._SECRET_ALL.search(" " + canary), canary
+
+
 def test_no_network_imports():
     pkg = Path(__file__).resolve().parent.parent / "llmsnitch"
     for p in pkg.glob("*.py"):
