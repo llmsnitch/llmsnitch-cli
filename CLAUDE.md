@@ -23,7 +23,7 @@ These are enforced by `tests/test_llmsnitch.py` — a change that breaks any of 
 
 ## Architecture
 
-Two packages ship in the wheel: `llmsnitch` (12 modules, ~1,800 LOC) and
+Two packages ship in the wheel: `llmsnitch` (15 modules) and
 `fs_coil` (the notify layer — the scan's finding routing imports it).
 
 - `cli.py` — argparse-free dispatch. `hook <event>` is the hot path; everything else is human-facing.
@@ -34,6 +34,7 @@ Two packages ship in the wheel: `llmsnitch` (12 modules, ~1,800 LOC) and
 - `setup_cmd.py` — prints or writes the Claude Code hooks block. `--write` **refuses to run inside a Claude Code session** (`CLAUDECODE` env set): the monitored agent must not edit its own hook wiring. Snapshots `settings.json` first.
 - `harness.py` / `ingest.py` — multi-harness support per `docs/harness-adapter-contract.md`: declarative registry + lazy ledger-first ingestion with cursors (codex is the first non-Claude harness, T106).
 - `scan.py` / `scanrules.py` — the config-audit surface: rule-pack audit over agent config artifacts; findings route through `fs_coil.notify` as `scan_finding`.
+- `intake.py` / `bulletin.py` / `depaudit.py` — the dep-audit surface (`docs/bulletin-spec.md`, wayfinder/dep-audit): intake extraction from stored sessions, bulletin cache verify/match, and the assembly that gates criticality on `(malicious ∧ intake) ∨ (intake ∧ kev ∧ exercised)`; findings route as `depaudit_finding`.
 - `patrol.py` — LaunchAgent plist print/`--write` for the daily unattended scan (`com.slav-it.llmsnitch-patrol`); `scan --patrol` stamps `meta.trigger`.
 - `__init__.py` — `__version__`.
 

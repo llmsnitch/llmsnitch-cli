@@ -4,10 +4,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tests import _seams, test_llmsnitch, test_notify, test_scan_notify  # noqa: E402
+from tests import (_seams, test_depaudit, test_depaudit_bulletin,  # noqa: E402
+                   test_depaudit_intake, test_llmsnitch, test_notify,
+                   test_scan_notify)
 
 code = 0
-for mod in (test_llmsnitch, test_notify, test_scan_notify):
+for mod in (test_llmsnitch, test_notify, test_scan_notify,
+            test_depaudit_intake, test_depaudit_bulletin, test_depaudit):
     print(f"== {mod.__name__} ==")
     code |= _seams.run(vars(mod))
 sys.exit(code)

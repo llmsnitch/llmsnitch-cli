@@ -89,6 +89,13 @@ produces bulletins is explicitly not built here. The map closes when
   **malicious ∧ intake pages critical immediately, bypassing the gate**;
   full predicate: `critical = (malicious ∧ intake) ∨ (intake ∧ kev.listed
   ∧ exercised)`; "Exercised" now canon in CONTEXT.md.
+- [T507 — Build the dep-audit MVP](tickets/T507-build-mvp.md) —
+  shipped: `intake.py`/`bulletin.py`/`depaudit.py` + `llmsnitch depaudit`
+  CLI (`--waive`), findings route as `depaudit_finding`; 117/117 tests;
+  survived two-axis + ponytail + security-sentinel gates (9 security
+  findings fixed); live-verified on this machine (8 real intakes, clean
+  scan vs the 19k bulletin, seeded MAL→waiver round-trip). Only T508
+  (activate) remains.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with
