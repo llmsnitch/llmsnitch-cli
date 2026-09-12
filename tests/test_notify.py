@@ -233,5 +233,13 @@ def test_actor_mismatch_is_critical_and_respects_window():
     _with_tmp(body)
 
 
+def test_icon_key_is_filename_safe():
+    from fs_coil.notifier import _icon_key
+    assert _icon_key("../../Evil Actor") == ".._.._evil_actor"
+    assert "/" not in _icon_key("a/b\\c")
+    assert _icon_key("") == ""
+    assert _icon_key("claude-code") == "claude-code"
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))
