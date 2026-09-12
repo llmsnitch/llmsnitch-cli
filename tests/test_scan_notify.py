@@ -206,5 +206,25 @@ def test_notifier_failure_never_breaks_scan():
     _with_tmp(body)
 
 
+def test_patrol_runs_depaudit_worst_verdict_wins():
+    """--patrol runs dep-audit in the same process (T508). A missing
+    bulletin is operational (2) on a clean scan; a scan breach (1) is
+    never masked by it; a plain scan never runs dep-audit."""
+    def body(t, delivered, errors):
+        clean = t / "clean" / ".claude"
+        clean.mkdir(parents=True)
+        (clean / "settings.json").write_text('{"model": "opus"}')
+        buf = io.StringIO()
+        assert scan.cmd_scan([str(t / "clean"), "--patrol"], buf) == 2
+        assert "bulletin" in buf.getvalue().lower(), buf.getvalue()
+        root = t / "proj"
+        _seed(root)
+        assert scan.cmd_scan([str(root), "--patrol"], io.StringIO()) == 1
+        buf2 = io.StringIO()
+        assert scan.cmd_scan([str(t / "clean")], buf2) == 0
+        assert "bulletin" not in buf2.getvalue().lower(), buf2.getvalue()
+    _with_tmp(body)
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

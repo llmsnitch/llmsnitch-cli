@@ -1,7 +1,7 @@
 # Dep-Audit — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN (charted 2026-09-11)`
+`status: DONE (charted 2026-09-11, closed 2026-09-12 — destination reached)`
 
 ## Destination
 
@@ -96,6 +96,15 @@ produces bulletins is explicitly not built here. The map closes when
   findings fixed); live-verified on this machine (8 real intakes, clean
   scan vs the 19k bulletin, seeded MAL→waiver round-trip). Only T508
   (activate) remains.
+- [T508 — Activate dep-audit](tickets/T508-activate.md) — merged to main
+  (`31027a6`, plan-004 collision → renumbered 011) + pipx reinstall;
+  patrol wiring = lazy in-process (`scan --patrol` also runs dep-audit,
+  worst-verdict-wins with breach dominant, tested; 118/118); weekly
+  refresh = documented manual distiller re-run (no provider URL yet, no
+  scheduling machinery); live-verified: patrol kickstart ledgers
+  dep-audit (12 intakes, bulletin age 0.5d, clean), seeded MAL→critical→
+  waiver round-trip via installed binary. All four done criteria hold —
+  **map closed**.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with

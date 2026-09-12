@@ -531,4 +531,12 @@ def cmd_scan(argv, out):
     breach = any(not f.get("resolved")
                  and _SEVERITY_RANK.get(f["severity"], 0) >= threshold
                  for f in findings)
-    return 1 if breach else 0
+    rc = 1 if breach else 0
+    if a.patrol_run:
+        # The daily patrol carries both surfaces in one process (T508).
+        # Worst verdict wins; a breach (1) in either surface is never
+        # masked by an operational failure (2) in the other.
+        from . import depaudit
+        dep_rc = depaudit.cmd_depaudit(["--format", a.fmt], out)
+        rc = 1 if 1 in (rc, dep_rc) else max(rc, dep_rc)
+    return rc
