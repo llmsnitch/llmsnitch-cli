@@ -257,7 +257,8 @@ def _load_baseline():
 def _save_baseline(baseline):
     store._mkdir_private(store.base_dir())
     p = _baseline_path()
-    p.write_text(json.dumps(baseline, indent=2))
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as f:
+        f.write(json.dumps(baseline, indent=2))
     store._chmod_private(p)
 
 
@@ -377,13 +378,14 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
 
     store._mkdir_private(d)
     nd = d / "findings.ndjson"
-    with open(nd, "w") as fh:
+    with os.fdopen(store._open_private(nd, os.O_WRONLY | os.O_TRUNC), "w") as fh:
         for f in findings:
             fh.write(json.dumps(f, separators=(",", ":")) + "\n")
     store._chmod_private(nd)
     meta["notify_routed"] = _route_to_notifier(findings)
     mp = d / "meta.json"
-    mp.write_text(json.dumps(meta, indent=2))
+    with os.fdopen(store._open_private(mp, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+        fh.write(json.dumps(meta, indent=2))
     store._chmod_private(mp)
     return meta, findings
 

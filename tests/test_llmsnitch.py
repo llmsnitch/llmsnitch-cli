@@ -616,6 +616,26 @@ def test_codex_hostile_native_id_cannot_escape_store():
     _with_codex_fixture(body)
 
 
+def test_clean_redacts_dict_keys_and_boundary():
+    from llmsnitch.hook import _clean
+    assert _clean({"sk-aaaaaaaaaaaa": 1}) == {"<redacted>": 1}, \
+        "secret used as a dict key must be redacted"
+    s = "x" * 1995 + "sk-" + "a" * 52   # secret straddles the 2000 cut
+    r = _clean(s)
+    assert "sk-" not in r, "boundary-straddling secret fragment reached output"
+    assert len(r) <= 2000, len(r)
+
+
+def test_new_files_created_0600():
+    def body(t):
+        store.append_event("s1", {"ts": 1.0, "event": "PreToolUse"})
+        store.write_meta("s1", {"session_id": "s1"})
+        for name in ("events.ndjson", "meta.json"):
+            p = t / "sessions" / "s1" / name
+            assert (p.stat().st_mode & 0o777) == 0o600, (name, oct(p.stat().st_mode))
+    _with_tmp_store(body)
+
+
 def test_hook_session_id_traversal_contained():
     from tests._seams import with_tmp
     def body(t, delivered, errors):

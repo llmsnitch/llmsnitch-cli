@@ -73,7 +73,10 @@ def _clean(obj, depth=0):
     if depth > 6:
         return "<deep>"
     if isinstance(obj, str):
-        s = obj[:_MAX_STR]
+        # 256-char margin past the cap: redact first, cut second, so a
+        # secret straddling the cut is matched before the truncation
+        # strands an unmatchable fragment. 256 covers every _SECRET shape.
+        s = obj[:_MAX_STR + 256]
         canon = _canonical(s)
         if canon != s:
             red_c = _SECRET.sub("<redacted>", canon)
@@ -82,10 +85,11 @@ def _clean(obj, depth=0):
                 # fullwidth homoglyph, bidi override). Store the redacted
                 # canonical view — losing the original bytes is the right
                 # trade for a secret; benign non-ASCII takes the raw path.
-                return red_c
-        return _SECRET.sub("<redacted>", s)
+                return red_c[:_MAX_STR]
+        return _SECRET.sub("<redacted>", s)[:_MAX_STR]
     if isinstance(obj, dict):
-        return {str(k)[:100]: _clean(v, depth + 1) for k, v in list(obj.items())[:50]}
+        return {_clean(str(k)[:100], depth + 1): _clean(v, depth + 1)
+                for k, v in list(obj.items())[:50]}
     if isinstance(obj, list):
         return [_clean(v, depth + 1) for v in obj[:50]]
     return obj
@@ -121,7 +125,7 @@ def handle(event_name, stdin=None):
             err = _is_error(resp)
             ev["error"] = err
             if err:  # keep an excerpt only on failure — successes stay lean
-                ev["error_excerpt"] = _clean(json.dumps(resp)[:400] if resp else "")
+                ev["error_excerpt"] = _clean(json.dumps(resp)[:656])[:400] if resp else ""
         elif event_name == "Stop":
             _finalize(sid, payload)
 

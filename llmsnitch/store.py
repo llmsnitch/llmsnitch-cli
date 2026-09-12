@@ -53,17 +53,28 @@ def _chmod_private(path):
         pass
 
 
+def _open_private(path, flags):
+    """Create at 0600 — never a first-write window at umask default."""
+    return os.open(str(path), flags | os.O_CREAT, 0o600)
+
+
 def append_event(session_id, event):
     p = session_dir(session_id) / "events.ndjson"
-    with open(p, "a") as f:
-        f.write(json.dumps(event, separators=(",", ":")) + "\n")
-    _chmod_private(p)
+    fd = _open_private(p, os.O_WRONLY | os.O_APPEND)
+    try:
+        os.write(fd, (json.dumps(event, separators=(",", ":")) + "\n").encode())
+    finally:
+        os.close(fd)
+    _chmod_private(p)   # repairs files that predate 0600-at-create
 
 
 def write_meta(session_id, meta):
     p = session_dir(session_id) / "meta.json"
-    p.write_text(json.dumps(meta, indent=2))
+    with os.fdopen(_open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as f:
+        f.write(json.dumps(meta, indent=2))
     _chmod_private(p)
+
+
 def read_meta(session_id):
     p = sessions_root() / _safe_sid(session_id) / "meta.json"
     try:
