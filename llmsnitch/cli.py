@@ -75,8 +75,8 @@ def cmd_show(sid, out):
                   f"({s.get('total_tokens', 0)} tokens)"
                   + (" — subscription plans not billed this\n"
                      if subscription else "\n"))
-        if s.get("cost_note"):
-            out.write(f"          {s['cost_note']}\n")
+    if s.get("cost_note"):
+        out.write(f"note      {s['cost_note']}\n")
     if s["tools"]:
         top = sorted(s["tools"].items(), key=lambda kv: -kv[1])
         out.write("by tool   " + ", ".join(f"{k}={v}" for k, v in top[:8]) + "\n")

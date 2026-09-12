@@ -616,6 +616,34 @@ def test_codex_hostile_native_id_cannot_escape_store():
     _with_codex_fixture(body)
 
 
+def test_cost_note_shown_in_show():
+    from tests._seams import with_tmp
+    from llmsnitch import cli
+    def body(t, delivered, errors):
+        # ingest shape: note without cost (codex sessions)
+        sdir = t / "store" / "sessions" / "codex-noted"
+        sdir.mkdir(parents=True)
+        (sdir / "meta.json").write_text(json.dumps({
+            "started_at": 1700000000.0, "cost_usd": None,
+            "cost_note": "unpriced: no vendor-cited rates "
+                         "for this provider yet"}))
+        out = io.StringIO()
+        assert cli.cmd_show("codex-noted", out) == 0
+        assert "unpriced" in out.getvalue(), out.getvalue()
+        # hook shape: note beside a cost figure (unknown model)
+        sdir = t / "store" / "sessions" / "priced-noted"
+        sdir.mkdir(parents=True)
+        (sdir / "meta.json").write_text(json.dumps({
+            "started_at": 1700000000.0, "cost_usd": 1.23, "total_tokens": 10,
+            "cost_note": "unknown model priced at sonnet tier"}))
+        out = io.StringIO()
+        assert cli.cmd_show("priced-noted", out) == 0
+        text = out.getvalue()
+        assert "1.23" in text, text
+        assert "unknown model priced at sonnet tier" in text, text
+    with_tmp(body, store=True)
+
+
 def test_no_network_imports():
     pkg = Path(__file__).resolve().parent.parent / "llmsnitch"
     for p in pkg.glob("*.py"):

@@ -117,6 +117,7 @@ def summarize(session_id):
         "errors": errors,
         "tools": tools,
         "cost_usd": meta.get("cost_usd"),
+        "cost_note": meta.get("cost_note"),
         "total_tokens": meta.get("total_tokens"),
         "cwd": meta.get("cwd", ""),
         "ended": bool(meta.get("ended_at")),
