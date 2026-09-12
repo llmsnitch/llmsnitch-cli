@@ -70,6 +70,13 @@ produces bulletins is explicitly not built here. The map closes when
   severity-band escalation or `kev.listed` flip, never EPSS; `all_versions`
   boolean (no `open_ended`), withdrawn dropped, `fixed_in`/`summary`/`url`
   display-only.
+- [T504 — Intake extraction design](tickets/T504-intake-extraction.md) —
+  Claude Code hook events only (codex = fog); pip/uv/pipx grammar with
+  **bulk intakes** for file-based installs (env-level attribution);
+  materialized `intakes.ndjson` + cursor (ingest pattern); env-resolution
+  chain ending in unresolved-stays-quiet; retroactive sweep = first run,
+  all history; no success filtering — the scan-time `dist-info` join is
+  the success oracle.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with
@@ -94,6 +101,9 @@ produces bulletins is explicitly not built here. The map closes when
   per ecosystem graduate one at a time, npm likely first.
 - **fs-coil site-packages attribution** — filesystem-write evidence as a
   secondary intake source for installs the ledger grammar misses.
+- **Codex command enrichment** — codex ledgers carry `exec_command`
+  records but `parse_codex` drops the text; emitting command events would
+  extend intake coverage to ledger-only harnesses (T504 decision 1).
 - **Bulletin authenticity (signing)** — the sidecar hash is integrity-only;
   a signed manifest with real key management is the v2 candidate once a real
   provider exists (T503, spec's "Out of contract" list).
