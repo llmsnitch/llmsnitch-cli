@@ -616,6 +616,23 @@ def test_codex_hostile_native_id_cannot_escape_store():
     _with_codex_fixture(body)
 
 
+def test_hook_session_id_traversal_contained():
+    from tests._seams import with_tmp
+    def body(t, delivered, errors):
+        rc = hook.handle("PreToolUse", _payload(
+            "PreToolUse", sid="../../ESCAPED/x", tool_name="Bash",
+            tool_input={"command": "ls"}))
+        assert rc == 0
+        root = t / "store" / "sessions"
+        escaped = [p for p in t.rglob("*ESCAPED*")
+                   if root not in p.parents]
+        assert not escaped, f"traversal escaped the store: {escaped}"
+        names = [d.name for d in root.iterdir()]
+        assert names == [".._.._ESCAPED_x"], names
+        assert all("/" not in n and n not in (".", "..") for n in names)
+    with_tmp(body, store=True)
+
+
 def test_cost_note_shown_in_show():
     from tests._seams import with_tmp
     from llmsnitch import cli

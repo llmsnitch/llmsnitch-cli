@@ -17,7 +17,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 003 | Frontmatter parse to fence, not 60-line window | P2 | S | — | DONE |
 | 004 | One command runs all 56 tests; docs corrected | P1 | S | — | DONE |
 | 005 | `cost_note` actually reaches the user | P2 | S | 004 | DONE |
-| 006 | Sanitize session ids at the store boundary | P2 | S | 004 | TODO |
+| 006 | Sanitize session ids at the store boundary | P2 | S | 004 | DONE |
 | 007 | Redaction/perms hardening (keys, truncation margin, 0600-at-create) | P2 | S | 004 | TODO |
 | 008 | fs_coil: icon-key sanitizer + log create-0600 | P3 | S | 004 | DONE |
 | 009 | Guard-branch tests (cli dispatch, walk guards, patrol, alien ledger, pattern composition) | P2 | M | 004; after 005–007 if queued | TODO |

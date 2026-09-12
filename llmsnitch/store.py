@@ -7,6 +7,7 @@ tolerates a bad tail (skip, never crash).
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -28,8 +29,21 @@ def sessions_root():
     return _mkdir_private(base_dir() / "sessions")
 
 
+# The watched harness is the adversary: a hostile session id must not steer
+# our writes (no separators, no traversal). Wider than ingest's 64 — ingest
+# store ids ("codex-" + 64-char native id) reach 70 chars.
+_SAFE_SID = re.compile(r"[A-Za-z0-9._-]{1,128}")
+
+
+def _safe_sid(session_id):
+    s = str(session_id)
+    if _SAFE_SID.fullmatch(s):
+        return s
+    return re.sub(r"[^A-Za-z0-9._-]", "_", s)[:128] or "unnamed"
+
+
 def session_dir(session_id):
-    return _mkdir_private(sessions_root() / str(session_id))
+    return _mkdir_private(sessions_root() / _safe_sid(session_id))
 
 
 def _chmod_private(path):
@@ -50,10 +64,8 @@ def write_meta(session_id, meta):
     p = session_dir(session_id) / "meta.json"
     p.write_text(json.dumps(meta, indent=2))
     _chmod_private(p)
-
-
 def read_meta(session_id):
-    p = sessions_root() / str(session_id) / "meta.json"
+    p = sessions_root() / _safe_sid(session_id) / "meta.json"
     try:
         m = json.loads(p.read_text())
         return m if isinstance(m, dict) else {}
@@ -62,7 +74,7 @@ def read_meta(session_id):
 
 
 def iter_events(session_id):
-    p = sessions_root() / str(session_id) / "events.ndjson"
+    p = sessions_root() / _safe_sid(session_id) / "events.ndjson"
     try:
         lines = p.read_text().splitlines()
     except OSError:
