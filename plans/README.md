@@ -21,7 +21,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 007 | Redaction/perms hardening (keys, truncation margin, 0600-at-create) | P2 | S | 004 | TODO |
 | 008 | fs_coil: icon-key sanitizer + log create-0600 | P3 | S | 004 | DONE |
 | 009 | Guard-branch tests (cli dispatch, walk guards, patrol, alien ledger, pattern composition) | P2 | M | 004; after 005–007 if queued | TODO |
-| 010 | Ship the `fs-coil` entry point | P3 | S | 004 | TODO |
+| 010 | Ship the `fs-coil` entry point | P3 | S | 004 | DONE |
 | 011 | Unattested-agent discovery (close coverage gap) | P2 | M | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
