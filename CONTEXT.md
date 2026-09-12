@@ -169,3 +169,11 @@ A user-granted exception silencing a specific dep-audit finding
 (advisory × package), carrying a reason, living until removed or the
 advisory's severity escalates.
 _Avoid_: exception, allowlist entry, suppression
+
+**Unattested agent**:
+A directory matching agent-home heuristics (`scanrules.DISCOVERY_*`) that
+sits outside every registered `TERRITORIES` prefix — a tool present on disk
+with no dossier. Distinct from the `unknown` actor-bucket (which also covers
+an intruder inside *known* territory). Emitted by the scan as
+`unattested_agent_home` (high) / `unattested_agent_worktree` (low).
+_Avoid_: rogue agent, unknown agent

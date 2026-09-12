@@ -206,6 +206,40 @@ def test_notifier_failure_never_breaks_scan():
     _with_tmp(body)
 
 
+def test_unattested_routing_tiers():
+    """An unattested home routes as a scan_finding ledger row with
+    actor_bucket unknown; the high patrol tier is never record_only, the
+    low manual tier is (via _route_to_notifier's auto low/info rule)."""
+    def body(t, delivered, errors):
+        home = t / "home"
+        d = home / ".faketool" / "sessions"
+        d.mkdir(parents=True)
+        (d / "s.jsonl").write_text('{"x": 1}\n')
+        proj = home / "proj"
+        proj.mkdir()
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(home)   # discover_roots defaults to $HOME
+        try:
+            scan.run_scan([str(proj)], False, "patrol")
+            scan.run_scan([str(proj)], False, "manual")
+        finally:
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+        rows_ = [r for r in _rows(t) if r["category"] == "scan_finding"]
+        high = [r for r in rows_
+                if r["subject"].startswith("unattested_agent_home")]
+        assert high, rows_
+        assert all(r["actor_bucket"] == "unknown" for r in high), high
+        assert not any(r.get("record_only") for r in high), high
+        low = [r for r in rows_
+               if r["subject"].startswith("unattested_agent_worktree")]
+        assert low, rows_
+        assert all(r.get("record_only") for r in low), low
+    _with_tmp(body)
+
+
 def test_patrol_runs_depaudit_worst_verdict_wins():
     """--patrol runs dep-audit in the same process (T508). A missing
     bulletin is operational (2) on a clean scan; a scan breach (1) is

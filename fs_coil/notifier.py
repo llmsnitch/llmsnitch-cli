@@ -6,6 +6,7 @@ Works both when fs-coil runs as root (LaunchDaemon) and as the user
 
 import os
 import pwd
+import re
 import subprocess
 import sys
 import time
@@ -17,6 +18,11 @@ from fs_coil.icons import (
     _bundle_icns, _icns_to_png,
 )
 from fs_coil.runtime import console_user, user_home
+
+
+def _icon_key(actor):
+    """Filename-safe cache key for an actor string."""
+    return re.sub(r"[^a-z0-9._-]", "_", (actor or "").lower())[:64]
 
 
 class Notifier:
@@ -59,7 +65,9 @@ class Notifier:
         """Return a PNG path for `actor`'s app icon, or None. Caches results."""
         if not actor or self._icon_dir is None:
             return None
-        key = actor.lower()
+        key = _icon_key(actor)
+        if not key:
+            return None
         if key in self._icon_cache:
             return self._icon_cache[key]
 

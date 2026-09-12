@@ -7,7 +7,8 @@ binary and stamps a ruleset checksum into every result. We follow
 skill-detector: see docs/research/scanner-survey-mvp.md §2.1.
 
 Severity is fixed per category (spec §2.5): config_compromise=critical,
-secret_at_rest=high, config_drift=high (control surfaces), scan_hygiene=low.
+secret_at_rest=high, config_drift=high (control surfaces), scan_hygiene=low,
+unattested_agent=high (plan 011).
 """
 
 import hashlib
@@ -28,6 +29,26 @@ TERRITORIES = {
     "windsurf":    ["~/.windsurf"],
     "agy":         ["~/.agy"],
 }
+
+# Un-dossiered agent-home discovery (plan 011). Depth-1 markers that mean
+# "a directory is an AI-agent home" — the admission test (CONTEXT.md) made
+# concrete. High-specificity only: config.toml / AGENTS.md are deliberately
+# excluded (too common: ~/.cargo, ~/.config).
+DISCOVERY_FILE_SIGNALS = frozenset({
+    "SKILL.md", "mcp.json", ".mcp.json", "mcp_config.json",
+    "claude_desktop_config.json", "hooks.json",
+})
+DISCOVERY_DIR_SIGNALS = frozenset({"sessions", "history"})
+# A sessions/history dir signals only when it holds a JSON(L) ledger file:
+# agent session stores are JSON/NDJSON, while ~/.vim/sessions (plain .vim
+# files) is a live false positive without this (plan 011 escape hatch).
+DISCOVERY_SESSION_EXTS = (".json", ".jsonl")
+
+# OS/system scopes: an unattested home here is high-blast-radius (→ high
+# tier regardless of trigger). Prefixes, ~-expanded at use.
+SYSTEM_TERRITORIES = ("~/Library", "/Library", "/etc", "/usr/local", "/opt")
+
+UNATTESTED_CATEGORY = "unattested_agent"   # fixed severity: high
 
 # (rule_id, category, severity, classes, compiled regex) — line-matched.
 # Shapes grounded in MIT/Apache sources only (survey Part 1); MEDUSA (AGPL)
@@ -120,4 +141,10 @@ def ruleset_sha256():
     every scan records which ruleset produced it."""
     blob = "|".join(sorted(f"{rid}:{rx.pattern}" for rid, _, _, _, rx in RULES))
     blob += "|secret_extra:" + SECRET_EXTRA.pattern
+    blob += "|territories:" + "|".join(
+        sorted(f"{a}:{','.join(sorted(p))}" for a, p in TERRITORIES.items()))
+    blob += "|discover_files:" + "|".join(sorted(DISCOVERY_FILE_SIGNALS))
+    blob += "|discover_dirs:" + "|".join(sorted(DISCOVERY_DIR_SIGNALS))
+    blob += "|discover_exts:" + "|".join(DISCOVERY_SESSION_EXTS)
+    blob += "|system_terr:" + "|".join(sorted(SYSTEM_TERRITORIES))
     return hashlib.sha256(blob.encode()).hexdigest()

@@ -298,6 +298,110 @@ def test_scan_walk_budget_overflow_is_counted():
     _with_tmp_store(body)
 
 
+def test_unattested_home_high_on_patrol():
+    """A dot-dir with a session ledger outside every territory is an
+    unattested agent home — high on a patrol (plan 011 D2)."""
+    from llmsnitch import scan
+    def body(t):
+        d = t / "home" / ".faketool" / "sessions"
+        d.mkdir(parents=True)
+        (d / "s.jsonl").write_text('{"x": 1}\n')
+        fnds = scan.discover_unattested("scan-x", "patrol",
+                                        roots=[str(t / "home")])
+        assert len(fnds) == 1, fnds
+        f = fnds[0]
+        assert f["rule_id"] == "unattested_agent_home"
+        assert f["severity"] == "high"
+        assert f["category"] == "unattested_agent"
+        assert f["agent"] == "unknown"
+    _with_tmp_store(body)
+
+
+def test_unattested_worktree_low_on_manual():
+    """Same home, manual trigger, non-system root → the low hygiene tier
+    with its own rule_id (distinct fingerprint; plan 011 D2)."""
+    from llmsnitch import scan
+    def body(t):
+        d = t / "home" / ".faketool" / "sessions"
+        d.mkdir(parents=True)
+        (d / "s.jsonl").write_text('{"x": 1}\n')
+        fnds = scan.discover_unattested("scan-x", "manual",
+                                        roots=[str(t / "home")])
+        assert len(fnds) == 1, fnds
+        f = fnds[0]
+        assert f["rule_id"] == "unattested_agent_worktree"
+        assert f["severity"] == "low"
+        assert f["category"] == "scan_hygiene"
+    _with_tmp_store(body)
+
+
+def test_known_territory_not_flagged():
+    """A signal inside a registered territory is not unattested — the
+    _agent_bucket skip must hold (plan 011 maintenance note)."""
+    from llmsnitch import scan
+    def body(t):
+        (t / ".claude").mkdir()
+        (t / ".claude" / "SKILL.md").write_text("---\nname: x\n---\nhi\n")
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(t)   # territories resolve via expanduser
+        try:
+            fnds = scan.discover_unattested("scan-x", "patrol",
+                                            roots=[str(t)])
+        finally:
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+        assert fnds == [], fnds
+    _with_tmp_store(body)
+
+
+def test_generic_dotdirs_no_false_positive():
+    """Ordinary dot-dirs never trip discovery: ~/.ssh, ~/.config (nested
+    config.toml), ~/.docker, and a vim sessions dir holding only .vim
+    files (the live FP that forced the JSON-ledger tightening)."""
+    from llmsnitch import scan
+    def body(t):
+        h = t / "home"
+        (h / ".ssh").mkdir(parents=True)
+        (h / ".ssh" / "config").write_text("Host *\n")
+        (h / ".config" / "foo").mkdir(parents=True)
+        (h / ".config" / "foo" / "config.toml").write_text("[x]\n")
+        (h / ".docker").mkdir()
+        (h / ".docker" / "config.json").write_text("{}\n")
+        (h / ".vim" / "sessions").mkdir(parents=True)
+        (h / ".vim" / "sessions" / "proj.vim").write_text("let v = 1\n")
+        for trigger in ("patrol", "manual"):
+            fnds = scan.discover_unattested("scan-x", trigger,
+                                            roots=[str(h)])
+            assert fnds == [], (trigger, fnds)
+    _with_tmp_store(body)
+
+
+def test_signal_detection_shallow_only():
+    """Signals count at depth 1 only — nested markers never trip
+    (plan 011 D4 discipline)."""
+    from llmsnitch import scan
+    def body(t):
+        h = t / "home"
+        sub = h / ".tool" / "sub"
+        sub.mkdir(parents=True)
+        (sub / "config.toml").write_text("[x]\n")
+        (sub / "mcp.json").write_text("{}\n")
+        fnds = scan.discover_unattested("scan-x", "patrol", roots=[str(h)])
+        assert fnds == [], fnds
+    _with_tmp_store(body)
+
+
+def test_ruleset_sha_deterministic_and_changed():
+    """The reproducibility stamp covers the discovery detector: stable
+    within a build, changed from the pre-011 ruleset."""
+    from llmsnitch import scanrules
+    pre_011 = "2af2b7ef48837f5c704e605c0770a2851b984ebe43a12d123aba4b0bbefee8ea"
+    assert scanrules.ruleset_sha256() == scanrules.ruleset_sha256()
+    assert scanrules.ruleset_sha256() != pre_011
+
+
 def test_scan_rules_resist_redos():
     """A crafted long line must not hang the ruleset (measured pre-fix:
     42s for 200KB of 'curl '; budget here is generous CI headroom)."""
@@ -614,6 +718,182 @@ def test_codex_hostile_native_id_cannot_escape_store():
         assert (t / "sessions" / "codex-rollout-evil").is_dir(), \
             "hostile id must fall back to sanitized filename stem"
     _with_codex_fixture(body)
+
+
+def test_clean_redacts_dict_keys_and_boundary():
+    from llmsnitch.hook import _clean
+    assert _clean({"sk-aaaaaaaaaaaa": 1}) == {"<redacted>": 1}, \
+        "secret used as a dict key must be redacted"
+    s = "x" * 1995 + "sk-" + "a" * 52   # secret straddles the 2000 cut
+    r = _clean(s)
+    assert "sk-" not in r, "boundary-straddling secret fragment reached output"
+    assert len(r) <= 2000, len(r)
+
+
+def test_new_files_created_0600():
+    def body(t):
+        store.append_event("s1", {"ts": 1.0, "event": "PreToolUse"})
+        store.write_meta("s1", {"session_id": "s1"})
+        for name in ("events.ndjson", "meta.json"):
+            p = t / "sessions" / "s1" / name
+            assert (p.stat().st_mode & 0o777) == 0o600, (name, oct(p.stat().st_mode))
+    _with_tmp_store(body)
+
+
+def test_hook_session_id_traversal_contained():
+    from tests._seams import with_tmp
+    def body(t, delivered, errors):
+        rc = hook.handle("PreToolUse", _payload(
+            "PreToolUse", sid="../../ESCAPED/x", tool_name="Bash",
+            tool_input={"command": "ls"}))
+        assert rc == 0
+        root = t / "store" / "sessions"
+        escaped = [p for p in t.rglob("*ESCAPED*")
+                   if root not in p.parents]
+        assert not escaped, f"traversal escaped the store: {escaped}"
+        names = [d.name for d in root.iterdir()]
+        assert names == [".._.._ESCAPED_x"], names
+        assert all("/" not in n and n not in (".", "..") for n in names)
+    with_tmp(body, store=True)
+
+
+def test_cost_note_shown_in_show():
+    from tests._seams import with_tmp
+    from llmsnitch import cli
+    def body(t, delivered, errors):
+        # ingest shape: note without cost (codex sessions)
+        sdir = t / "store" / "sessions" / "codex-noted"
+        sdir.mkdir(parents=True)
+        (sdir / "meta.json").write_text(json.dumps({
+            "started_at": 1700000000.0, "cost_usd": None,
+            "cost_note": "unpriced: no vendor-cited rates "
+                         "for this provider yet"}))
+        out = io.StringIO()
+        assert cli.cmd_show("codex-noted", out) == 0
+        assert "unpriced" in out.getvalue(), out.getvalue()
+        # hook shape: note beside a cost figure (unknown model)
+        sdir = t / "store" / "sessions" / "priced-noted"
+        sdir.mkdir(parents=True)
+        (sdir / "meta.json").write_text(json.dumps({
+            "started_at": 1700000000.0, "cost_usd": 1.23, "total_tokens": 10,
+            "cost_note": "unknown model priced at sonnet tier"}))
+        out = io.StringIO()
+        assert cli.cmd_show("priced-noted", out) == 0
+        text = out.getvalue()
+        assert "1.23" in text, text
+        assert "unknown model priced at sonnet tier" in text, text
+    with_tmp(body, store=True)
+
+
+def test_cli_main_dispatch():
+    """main() routing: --version -> 0, bare invocation -> help text rc 0,
+    unknown command -> help text rc 2."""
+    import contextlib
+    from llmsnitch import cli
+    def body(t):
+        def call(argv):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cli.main(argv)
+            return rc, buf.getvalue()
+        rc, text = call(["--version"])
+        assert rc == 0 and "llmsnitch" in text, text
+        rc, text = call([])
+        assert rc == 0 and "llmsnitch CLI" in text, text
+        rc, text = call(["frobnicate"])
+        assert rc == 2, rc
+    _with_tmp_store(body)
+
+
+def test_scan_walk_skips_junk_and_depth():
+    """discover() prunes _SKIP_DIRS and dot-dirs and stops at _MAX_DEPTH:
+    only the plain-dir artifact within depth survives."""
+    from llmsnitch import scan
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        for rel in ("node_modules", ".git", "a/b/c/d/e/f/g", "keep"):
+            d = root / rel
+            d.mkdir(parents=True)
+            (d / "CLAUDE.md").write_text("# x\n")
+        targets, _ = scan.discover([str(root)])
+        paths = [str(p) for p, _, _ in targets]
+        assert len(paths) == 1, paths
+        assert paths[0].endswith(os.path.join("keep", "CLAUDE.md")), paths
+        for junk in ("node_modules", os.path.join(td, ".git"),
+                     os.path.join("f", "g")):
+            assert not any(junk in p for p in paths), (junk, paths)
+
+
+def test_patrol_write_default_path_and_launchctl():
+    """--write with no seam path takes the default branch: HOME-anchored
+    plist + log dir, bootout then bootstrap; bootstrap rc!=0 exits 2."""
+    import types
+    from llmsnitch import patrol
+    with tempfile.TemporaryDirectory() as td:
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = td
+        calls = []
+        boot_rc = {"bootstrap": 0}
+        def recorder(args, **kw):
+            calls.append(args[1])
+            code = boot_rc["bootstrap"] if args[1] == "bootstrap" else 0
+            return types.SimpleNamespace(returncode=code, stdout="", stderr="")
+        old_run = patrol.subprocess.run
+        patrol.subprocess.run = recorder
+        try:
+            assert patrol.run(True, io.StringIO()) == 0
+            plist = (Path(td) / "Library" / "LaunchAgents"
+                     / f"{patrol.LABEL}.plist")
+            assert plist.is_file(), "HOME override must redirect expanduser"
+            assert (Path(td) / "Library" / "Logs" / "llmsnitch").is_dir()
+            assert calls == ["bootout", "bootstrap"], calls
+            boot_rc["bootstrap"] = 1
+            assert patrol.run(True, io.StringIO()) == 2
+        finally:
+            patrol.subprocess.run = old_run
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+
+
+def test_ingest_skips_alien_ledger():
+    """A rollout file with neither a session_meta id nor any model parses to
+    None: no session written, cursor still recorded, second sweep skips it."""
+    from llmsnitch import harness, ingest
+    def body(t):
+        led = t / "ledger"
+        led.mkdir()
+        alien = led / "rollout-alien.jsonl"
+        alien.write_text(
+            '{"timestamp":"2026-08-20T10:00:00.000Z","type":"event_msg",'
+            '"payload":{"type":"agent_message","message":"hi"}}\n'
+            '{"note":"valid json, but no payload at all"}\n')
+        old = harness.HARNESSES["codex"]["session_paths"]
+        harness.HARNESSES["codex"]["session_paths"] = [str(led / "rollout-*.jsonl")]
+        try:
+            assert ingest.sweep() == 0
+            sess = t / "sessions"
+            assert not (sess.is_dir() and list(sess.glob("codex-*")))
+            state = json.loads((t / "ingest-state.json").read_text())
+            assert str(alien) in state, "cursor must be recorded"
+            assert ingest.sweep() == 0
+        finally:
+            harness.HARNESSES["codex"]["session_paths"] = old
+    _with_tmp_store(body)
+
+
+def test_secret_pattern_composition():
+    """Pins the hook._SECRET-inside-scan._SECRET_ALL embedding: everything
+    _SECRET matches at a non-alnum left edge, _SECRET_ALL must also match."""
+    from llmsnitch import scan
+    from llmsnitch.hook import _SECRET
+    for canary in ("sk-abcdefgh1234", "ghp_abcdefghij12",
+                   "xoxb-1234567890-ab", "AKIAABCDEFGHIJKLMNOP",
+                   "eyJ" + "a" * 40, "Bearer " + "a" * 20,
+                   "-----BEGIN RSA PRIVATE KEY-----"):
+        assert _SECRET.search(canary), canary
+        assert scan._SECRET_ALL.search(" " + canary), canary
 
 
 def test_no_network_imports():

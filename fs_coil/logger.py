@@ -111,7 +111,8 @@ class Logger:
             if self._fp:
                 self._fp.close()
             logfile = self.dir / f"fs-coil-{day}.log"
-            self._fp = open(logfile, "a", buffering=1)
+            fd = os.open(logfile, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            self._fp = os.fdopen(fd, "a", buffering=1)
             try:
                 os.chmod(logfile, 0o600)
             except OSError:

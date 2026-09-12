@@ -13,6 +13,7 @@ dependencies = []          # stdlib only, forever — this is a design constrain
 
 [project.scripts]
 llmsnitch = "llmsnitch.cli:main"
+fs-coil = "fs_coil.cli:main"
 
 [tool.setuptools]
 # fs_coil ships too: the scan's notify routing imports it, and a pipx venv

@@ -44,7 +44,8 @@ def _load_state():
 def _save_state(state):
     store._mkdir_private(store.base_dir())
     p = _state_path()
-    p.write_text(json.dumps(state, separators=(",", ":")))
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as f:
+        f.write(json.dumps(state, separators=(",", ":")))
     store._chmod_private(p)
 
 
@@ -65,7 +66,7 @@ def _write_session(name, path, parsed):
     rows = [{"ts": parsed.get("started_at"), "event": "session_start"}]
     rows += parsed["events"]
     rows.append({"ts": parsed.get("ended_at"), "event": "session_end"})
-    with open(ev_path, "w") as f:
+    with os.fdopen(store._open_private(ev_path, os.O_WRONLY | os.O_TRUNC), "w") as f:
         for r in rows:
             r.update({"harness": name, "src": src["path"], "src_sha256": src["sha256"]})
             f.write(json.dumps(r, separators=(",", ":")) + "\n")

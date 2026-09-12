@@ -192,6 +192,118 @@ def _finding(scan_id, rule_id, category, severity, path, cls, agent,
             "fingerprint": _fingerprint(rule_id, art)}
 
 
+# -- unattested-agent discovery (plan 011) ------------------------------------
+
+_DISCOVER_MAX = 500   # candidate-dir cap; the sweep is cheap but bounded
+
+
+def _discover_roots():
+    """Roots whose top-level dirs are probed for un-dossiered agent homes.
+    [scan] discover_roots = colon-separated paths; default = $HOME.
+    Malformed config falls back to $HOME (never raises)."""
+    import configparser
+    home = os.path.expanduser("~")
+    path = os.path.expanduser("~/.config/llmsnitch/config")
+    cp = configparser.ConfigParser(inline_comment_prefixes=("#",))
+    try:
+        cp.read(path)
+    except configparser.Error:
+        return [home]
+    raw = cp.get("scan", "discover_roots", fallback="~")
+    roots = [os.path.expanduser(r.strip()) for r in raw.split(":") if r.strip()]
+    return roots or [home]
+
+
+def _dir_finding(scan_id, rule_id, category, severity, dirpath, signal):
+    """_finding's sibling for a discovered directory: no line, no content
+    hash, classify() has no class for it. Same dict shape — downstream
+    (new-flag pass, routing, to_text) assumes these keys. agent stays the
+    bare shared "unknown" bucket (plan 011 D1): per-dir grain lives in the
+    fingerprint; a per-dir bucket would defeat notify-layer novelty and
+    re-page every patrol."""
+    art = _display(dirpath)
+    return {"v": 1, "ts": store.now(), "scan_id": scan_id,
+            "rule_id": rule_id, "category": category, "severity": severity,
+            "artifact": art, "artifact_class": "agent_home",
+            "agent": "unknown", "line": 0,
+            "evidence": f"agent-home signal: {signal}", "sha256": "",
+            "fingerprint": _fingerprint(rule_id, art)}
+
+
+def discover_unattested(scan_id, trigger, roots=None):
+    """Un-dossiered agent homes: top-level dirs under each discover-root
+    that carry an agent-home signal (scanrules.DISCOVERY_*) and sit outside
+    every known TERRITORY. Tier by context (plan 011 D2): patrol or a
+    SYSTEM_TERRITORIES path → unattested_agent (high); manual non-system →
+    scan_hygiene (low, record_only via routing). Routed as scan_finding, so
+    quiet on cold start by design (D3): the first-ever scan ledgers, digests
+    and trips the gate but does not banner. Depth-1, symlinks skipped,
+    bounded. Never raises — a bad root is skipped."""
+    home = os.path.expanduser("~")
+    roots = roots if roots is not None else _discover_roots()
+    sys_prefixes = [os.path.expanduser(p) for p in scanrules.SYSTEM_TERRITORIES]
+    out, seen, budget = [], set(), _DISCOVER_MAX
+    for root in roots:
+        is_home = os.path.realpath(root) == os.path.realpath(home)
+        try:
+            entries = list(os.scandir(root))
+        except OSError:
+            continue
+        for e in entries:
+            if budget <= 0:
+                return out
+            try:
+                if not e.is_dir(follow_symlinks=False):
+                    continue
+            except OSError:
+                continue
+            name = e.name
+            if is_home and not name.startswith("."):
+                continue                      # $HOME: dot-dirs only
+            p = e.path
+            if p in seen:
+                continue
+            seen.add(p)
+            budget -= 1
+            if _agent_bucket(p) != "unknown":
+                continue                      # a known territory — skip
+            sig = _home_signal(p)
+            if not sig:
+                continue
+            in_system = any(p == sp or p.startswith(sp + os.sep)
+                            for sp in sys_prefixes)
+            tier = (("unattested_agent_home", scanrules.UNATTESTED_CATEGORY,
+                     "high") if trigger == "patrol" or in_system
+                    else ("unattested_agent_worktree", "scan_hygiene", "low"))
+            out.append(_dir_finding(scan_id, *tier, p, sig))
+    return out
+
+
+def _home_signal(dirpath):
+    """First agent-home signal directly inside dirpath, or None. Depth-1."""
+    try:
+        entries = list(os.scandir(dirpath))
+    except OSError:
+        return None
+    for e in entries:
+        try:
+            if e.is_file(follow_symlinks=False) and \
+                    e.name in scanrules.DISCOVERY_FILE_SIGNALS:
+                return e.name
+            if e.is_dir(follow_symlinks=False) and \
+                    e.name in scanrules.DISCOVERY_DIR_SIGNALS:
+                try:
+                    if any(c.is_file(follow_symlinks=False) and
+                           c.name.endswith(scanrules.DISCOVERY_SESSION_EXTS)
+                           for c in os.scandir(e.path)):
+                        return e.name + "/"
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return None
+
+
 def _frontmatter_allowed_tools(text):
     """Hand parser: 'allowed-tools:' value between the first two --- fences.
     Returns None when the key (or the opening fence) is absent. Bounded at
@@ -257,7 +369,8 @@ def _load_baseline():
 def _save_baseline(baseline):
     store._mkdir_private(store.base_dir())
     p = _baseline_path()
-    p.write_text(json.dumps(baseline, indent=2))
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as f:
+        f.write(json.dumps(baseline, indent=2))
     store._chmod_private(p)
 
 
@@ -352,6 +465,11 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
         current[f"{cls}\x1f{_display(path)}"] = (sha, cls, agent)
         findings.extend(fnds)
 
+    # Discovery sweeps its own [scan] discover_roots, not the target-scan
+    # roots above — those mean "what to audit", these mean "where agents
+    # might live" (plan 011 step 5).
+    findings.extend(discover_unattested(scan_id, trigger))
+
     baseline = _load_baseline()
     findings.extend(_drift(scan_id, baseline, current, rebaseline))
     _save_baseline(baseline)
@@ -377,13 +495,14 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
 
     store._mkdir_private(d)
     nd = d / "findings.ndjson"
-    with open(nd, "w") as fh:
+    with os.fdopen(store._open_private(nd, os.O_WRONLY | os.O_TRUNC), "w") as fh:
         for f in findings:
             fh.write(json.dumps(f, separators=(",", ":")) + "\n")
     store._chmod_private(nd)
     meta["notify_routed"] = _route_to_notifier(findings)
     mp = d / "meta.json"
-    mp.write_text(json.dumps(meta, indent=2))
+    with os.fdopen(store._open_private(mp, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+        fh.write(json.dumps(meta, indent=2))
     store._chmod_private(mp)
     return meta, findings
 
