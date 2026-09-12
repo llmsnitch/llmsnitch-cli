@@ -14,7 +14,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 001 | Fix ReDoS in scan rules (+ adversarial tests) | P1 | M | — | DONE |
 | 002 | Make walk-budget truncation visible | P1 | S | — | DONE |
 | 003 | Frontmatter parse to fence, not 60-line window | P2 | S | — | DONE |
-| 004 | One command runs all 56 tests; docs corrected | P1 | S | — | TODO |
+| 004 | One command runs all 56 tests; docs corrected | P1 | S | — | DONE |
 | 005 | `cost_note` actually reaches the user | P2 | S | 004 | TODO |
 | 006 | Sanitize session ids at the store boundary | P2 | S | 004 | TODO |
 | 007 | Redaction/perms hardening (keys, truncation margin, 0600-at-create) | P2 | S | 004 | TODO |

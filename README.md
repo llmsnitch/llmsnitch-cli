@@ -50,6 +50,8 @@ llmsnitch scan             # config-audit over agent artifacts
 llmsnitch patrol           # print/--write the daily-scan LaunchAgent
 ```
 
+Patrol logs live at `~/Library/Logs/llmsnitch/patrol.{out,err}`.
+
 Thresholds in `~/.config/llmsnitch/config`:
 
 ```ini
@@ -75,8 +77,11 @@ with a note rather than an invented rate.
 ## Test
 
 ```bash
-python3 tests/test_llmsnitch.py
+python3 tests/all.py
 ```
+
+Each file under `tests/` also runs standalone, e.g.
+`python3 tests/test_llmsnitch.py`.
 
 ## License
 
