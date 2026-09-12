@@ -14,13 +14,19 @@ conditions, and update your row when done.
 | 001 | Fix ReDoS in scan rules (+ adversarial tests) | P1 | M | — | DONE |
 | 002 | Make walk-budget truncation visible | P1 | S | — | DONE |
 | 003 | Frontmatter parse to fence, not 60-line window | P2 | S | — | DONE |
+| 004 | Unattested-agent discovery (close coverage gap) | P2 | M | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 
 ## Dependency notes
 
-- None — the three plans are independent. 001 first anyway: it is the only
-  one an adversary can trigger remotely-ish (a downloaded skill bundle).
+- 001–003 are independent (001 first: the only adversary-triggerable one).
+- 004 is independent of 001–003. Written at commit `53b1ab4` (2026-09-09),
+  prompted by the "Bari AI" coverage-gap incident and grounded in
+  `docs/research/scanner-survey-mvp.md` §2.1/§2.2/§2.5. Steps 1–6 are the
+  low-risk core; Step 7 (cold-start banner) is a decision-gated follow-on
+  that touches `fs_coil/notify.py` — do not start it without maintainer
+  sign-off.
 
 ## Findings considered and rejected
 
