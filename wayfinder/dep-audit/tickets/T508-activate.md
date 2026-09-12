@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: T507`
 `blocks: —`
-`status: OPEN`
+`status: CLAIMED (session 6098b27b, 2026-09-12)`
 
 ## Question
 
