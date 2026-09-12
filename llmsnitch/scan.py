@@ -209,8 +209,7 @@ def _discover_roots():
         cp.read(path)
     except configparser.Error:
         return [home]
-    raw = cp.get("scan", "discover_roots", fallback="~") \
-        if cp.has_section("scan") else "~"
+    raw = cp.get("scan", "discover_roots", fallback="~")
     roots = [os.path.expanduser(r.strip()) for r in raw.split(":") if r.strip()]
     return roots or [home]
 
@@ -273,14 +272,10 @@ def discover_unattested(scan_id, trigger, roots=None):
                 continue
             in_system = any(p == sp or p.startswith(sp + os.sep)
                             for sp in sys_prefixes)
-            if trigger == "patrol" or in_system:
-                out.append(_dir_finding(
-                    scan_id, "unattested_agent_home",
-                    scanrules.UNATTESTED_CATEGORY, "high", p, sig))
-            else:
-                out.append(_dir_finding(
-                    scan_id, "unattested_agent_worktree",
-                    "scan_hygiene", "low", p, sig))
+            tier = (("unattested_agent_home", scanrules.UNATTESTED_CATEGORY,
+                     "high") if trigger == "patrol" or in_system
+                    else ("unattested_agent_worktree", "scan_hygiene", "low"))
+            out.append(_dir_finding(scan_id, *tier, p, sig))
     return out
 
 
