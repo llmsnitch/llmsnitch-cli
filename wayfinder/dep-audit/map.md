@@ -77,6 +77,13 @@ produces bulletins is explicitly not built here. The map closes when
   chain ending in unresolved-stays-quiet; retroactive sweep = first run,
   all history; no success filtering — the scan-time `dist-info` join is
   the success oracle.
+- [T506 — Interim bulletin](tickets/T506-interim-bulletin.md) —
+  `tools/distill_bulletin.py` (out-of-package, `uv run`, curl-only egress)
+  distills OSV+KEV+EPSS into a full-PyPI v1 bulletin at
+  `~/.llmsnitch/bulletins/pypi.json.gz` + `.sha256` (19,033 entries, 11,717
+  malicious, 21 KEV-listed, 1.1 MB gz); manual weekly re-run is the provider
+  stand-in; ticket's "this machine's 9 envs" scope superseded by T503's
+  full-ecosystem rule.
 - Grilling rounds 1+2 (pre-charting, recorded here since they shaped the
   map): destination = working MVP; lost transcripts dropped (enough seen);
   population = **(c) agent-installed only** — proof from ledgers, with
