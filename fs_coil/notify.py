@@ -44,12 +44,14 @@ CATEGORIES = {
     "keychain_access":        ("5m",  "high", "check which item was read; rotate if unexpected"),
     "threshold_breach":       ("0",   "high", "review the session; kill the runaway session"),
     "scan_finding":           ("24h", "high", "review the findings: llmsnitch scan --report"),
+    "depaudit_finding":       ("24h", "critical", "uninstall if unexpected; detail: llmsnitch depaudit"),
 }
 
 _SURFACE_SECTION = {          # fixed surface -> config-section map
     "fs-coil-light": "notify.fs-coil",
     "fs-coil-deep":  "notify.fs-coil",
     "config-audit":  "notify.config-audit",
+    "dep-audit":     "notify.dep-audit",
 }
 _GLYPH = {"fs-coil-deep": "🦍"}   # default 🐍
 

@@ -5,6 +5,8 @@
   llmsnitch show <id>         one session: aggregates + recent events
   llmsnitch check             cost/fail-rate/health gate (exit 0/1/2)
   llmsnitch scan [ROOT ...]   config audit over agent artifacts (exit 0/1/2)
+  llmsnitch depaudit          intakes x bulletin dep audit (exit 0/1/2);
+                              --waive ID PACKAGE --reason TEXT adds a waiver
   llmsnitch patrol [--write]  print/install the daily scan LaunchAgent
   llmsnitch ingest            sweep harness ledgers (also runs lazily
                               before list/show/check)
@@ -115,6 +117,9 @@ def main(argv=None):
         return gate.cmd_check(gate.load_cfg(), out)
     if cmd == "scan":
         return scan.cmd_scan(argv[1:], out)
+    if cmd == "depaudit":
+        from . import depaudit
+        return depaudit.cmd_depaudit(argv[1:], out)
     if cmd == "patrol":
         from . import patrol
         return patrol.run("--write" in argv, out)

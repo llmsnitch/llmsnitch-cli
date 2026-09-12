@@ -1,4 +1,4 @@
-# Plan 004 — Unattested-agent discovery (close the coverage gap)
+# Plan 011 — Unattested-agent discovery (close the coverage gap)
 
 - **Status:** TODO
 - **Priority:** P2 (capability gap, not a live vuln)
@@ -38,7 +38,7 @@ instead of a passive inventory dump (which names no Decision and so fails
 the AGENTS.md gate), discovery emits a finding that names one. The survey is
 a research doc under `docs/research/`, not a normative spec, so its lingering
 `--inventory`/`--out` references (§2.1:366, §2.4:511) dangle harmlessly; a
-one-line "superseded by plan 004" footnote there is a nice-to-have, not a
+one-line "superseded by plan 011" footnote there is a nice-to-have, not a
 blocker, and is out of scope for the executor.
 
 ---
@@ -149,7 +149,7 @@ survey doc.
 Add after `TERRITORIES` (`scanrules.py:30`):
 
 ```python
-# Un-dossiered agent-home discovery (plan 004). Depth-1 markers that mean
+# Un-dossiered agent-home discovery (plan 011). Depth-1 markers that mean
 # "a directory is an AI-agent home" — the admission test (CONTEXT.md) made
 # concrete. High-specificity only: config.toml / AGENTS.md are deliberately
 # excluded (too common: ~/.cargo, ~/.config).
@@ -246,7 +246,7 @@ _DISCOVER_MAX = 500   # candidate-dir cap; the sweep is cheap but bounded
 def discover_unattested(scan_id, trigger, roots=None):
     """Un-dossiered agent homes: top-level dirs under each discover-root
     that carry an agent-home signal (scanrules.DISCOVERY_*) and sit outside
-    every known TERRITORY. Tier by context (plan 004 D2). Depth-1, symlinks
+    every known TERRITORY. Tier by context (plan 011 D2). Depth-1, symlinks
     skipped, bounded. Never raises — a bad root is skipped."""
     home = os.path.expanduser("~")
     roots = roots if roots is not None else _discover_roots()

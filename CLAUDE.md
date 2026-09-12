@@ -23,7 +23,7 @@ These are enforced by `tests/test_llmsnitch.py` — a change that breaks any of 
 
 ## Architecture
 
-Two packages ship in the wheel: `llmsnitch` (12 modules, ~1,800 LOC) and
+Two packages ship in the wheel: `llmsnitch` (15 modules) and
 `fs_coil` (the notify layer — the scan's finding routing imports it).
 
 - `cli.py` — argparse-free dispatch. `hook <event>` is the hot path; everything else is human-facing.
@@ -34,6 +34,7 @@ Two packages ship in the wheel: `llmsnitch` (12 modules, ~1,800 LOC) and
 - `setup_cmd.py` — prints or writes the Claude Code hooks block. `--write` **refuses to run inside a Claude Code session** (`CLAUDECODE` env set): the monitored agent must not edit its own hook wiring. Snapshots `settings.json` first.
 - `harness.py` / `ingest.py` — multi-harness support per `docs/harness-adapter-contract.md`: declarative registry + lazy ledger-first ingestion with cursors (codex is the first non-Claude harness, T106).
 - `scan.py` / `scanrules.py` — the config-audit surface: rule-pack audit over agent config artifacts; findings route through `fs_coil.notify` as `scan_finding`.
+- `intake.py` / `bulletin.py` / `depaudit.py` — the dep-audit surface (`docs/bulletin-spec.md`, wayfinder/dep-audit): intake extraction from stored sessions, bulletin cache verify/match, and the assembly that gates criticality on `(malicious ∧ intake) ∨ (intake ∧ kev ∧ exercised)`; findings route as `depaudit_finding`.
 - `patrol.py` — LaunchAgent plist print/`--write` for the daily unattended scan (`com.slav-it.llmsnitch-patrol`); `scan --patrol` stamps `meta.trigger`.
 - `__init__.py` — `__version__`.
 
@@ -42,7 +43,8 @@ Data flow: Claude Code hook → `cli hook <event>` → `hook.handle` → `store.
 ## Commands
 
 ```bash
-python3 tests/test_llmsnitch.py       # the whole suite; stdlib runner, no pytest
+python3 tests/all.py                 # the whole suite (3 files); stdlib runner, no pytest
+python3 tests/test_llmsnitch.py       # any single test file still runs standalone
 pip install -e .                       # dev install; entry point: llmsnitch
 llmsnitch setup                        # print hooks block
 llmsnitch setup --write                # install (from a plain terminal, not inside CC)
@@ -51,6 +53,13 @@ LLMSNITCH_DIR=/tmp/foo llmsnitch …     # override base dir (used by tests)
 ```
 
 Run one test: there is no framework, just call it — `python3 -c "from tests.test_llmsnitch import test_hook_records_and_redacts as t; t()"`.
+
+### Environment
+
+- `LLMSNITCH_DIR` — override base dir `~/.llmsnitch` (test seam; also usable in production).
+- `LLMSNITCH_NOTIFY_DIR`, `LLMSNITCH_HOT_STATE`, `LLMSNITCH_CONFIG` — test seams for the notify layer and config path; production never sets these.
+- `CODEX_HOME` — relocates `~/.codex` for codex ingest.
+- Patrol logs: `~/Library/Logs/llmsnitch/patrol.{out,err}`.
 
 ## House rules (from user global instructions and repo memory)
 
