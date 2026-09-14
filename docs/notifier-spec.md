@@ -548,9 +548,8 @@ Full worked example:
 # Global cross-cutting knobs.
 enabled = true                 # master switch; false = ledger-only, no pages
 outlet_nc = true               # Notification Center banners
-outlet_digest = true           # the digest's threshold-gated NC banner ONLY —
+outlet_digest = true           # the digest's HEALTH banner only (T601) —
                                # the digest FILE is always written (D18)
-digest_banner_threshold = 20   # NC banner when any category's day-count >= this
 degraded_flag_ttl = 24h        # degraded flag auto-expires after this
 cold_start = 24h               # learning window after install (D23)
 # critical_patterns = ~/.ssh/**, ~/.aws/**   # deny rules tagged critical
@@ -629,47 +628,74 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 
 ### 3. Daily digest
 
-- New `fs-coil digest` subcommand, run by a new user LaunchAgent
-  `com.slav-it.llmsnitch-digest.plist` (daily at 09:00,
-  `StartCalendarInterval`). Full plist — T007 installs this verbatim at
-  `~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist` and loads it
-  with `launchctl bootstrap gui/$(id -u) <path>`:
+Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
+09:00 / threshold-banner design that preceded it.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.slav-it.llmsnitch-digest</string>
-  <key>ProgramArguments</key>
-  <array><string>/usr/local/bin/fs-coil</string><string>digest</string></array>
-  <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
-</dict></plist>
-```
-- Reads the *previous day's* ledger file. Always writes
-  `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt` (0600) — the
-  file is unconditional (D18); no config key disables it.
-- Posts one NC banner iff `outlet_digest` is true AND any category's
-  day-count ≥ `digest_banner_threshold` (default 20) — threshold-gated
-  push, always-on pull (D18). (`outlet_nc` does not gate this banner; the
-  two outlets toggle independently.)
-- Content, in order: ① any `actor_mismatch` rows (each with an
-  investigate-action line), ② degraded-flag warning if set, ③ per-category
-  per-actor counts with first/last timestamps, ④ the anomaly section once
-  the content-based digest ships (phase 2, below).
+- `fs-coil digest [--full] [--show] [--prune]`, run daily at **10:00** by
+  its own user LaunchAgent `com.slav-it.llmsnitch-digest` — half an hour
+  after the 09:30 patrol, so the digest can report whether the patrol ran.
+  The plist is generated, never hand-written: `fs-coil digest
+  --install-agent` prints it, `--install-agent --write` writes it to
+  `~/Library/LaunchAgents/` and bootstraps it (mirrors `llmsnitch patrol`).
+  ProgramArguments: `~/.local/bin/fs-coil digest --prune` (the pipx shim;
+  `/usr/local/bin` is the deep daemon's path, not the user CLI's). Stdout /
+  stderr to `~/Library/Logs/llmsnitch/digest.{out,err}`.
+- **Window**: the trailing 24 hours — precisely, from the previous digest
+  file's mtime (newest `digest-*.txt` other than today's) to now, so a
+  missed day is covered by the next digest; capped at 7 days; 24h when no
+  previous digest exists.
+- **File**: always writes `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt`
+  (0600, chown'd to the console user when euid is 0 — the same
+  `_mkdir_owned`/`_chown_user` discipline as the ledger). Unconditional
+  (D18); no config key disables it. `--show` prints the newest digest
+  file; `--full` lifts the one-screen cap on section ②; `--prune` runs
+  `prune --target notify` after writing (one plist command does both).
+- **Content, in order** (every line: Decision / Actor / Novelty):
+  ① **health** — last patrol run (newest `~/.llmsnitch/scans/*/meta.json`
+    with `trigger == "patrol"`; missed if older than 26h or absent),
+    last dep-audit run + bulletin age (from `~/.llmsnitch/depaudit-state.json`,
+    stamped by `llmsnitch depaudit` at the end of every completed run;
+    missed if older than 26h or absent, stale if bulletin age > 14 days
+    or unknown), degraded flag (`notify.get_degraded()`), and the count of
+    ledger lines the reader skipped as garbage.
+  ② **new since last digest** — subjects `(category, actor_bucket,
+    subject)` in the window that did not appear in the ledger during the
+    7 days before it; ordered critical → high → lesser (low severity /
+    `record_only`, i.e. new unattested agents, dep-audit lesser findings),
+    grouped by category with that category's `CATEGORIES` decision line
+    once per group. Known repeats are never listed individually. Capped
+    at 20 subjects unless `--full`.
+  ③ **counts** per category × actor_bucket: rows, and new / known /
+    resolved subject counts — resolved = seen in the previous window of
+    equal length, absent in this one.
+  ④ **noisiest** — the five subjects with the most rows in the window.
+  Phase 2's anomaly section, when it ships, follows ④.
+- **New / known / resolved are subject-level**, computed from row
+  presence across ledger files — *not* from `novelty_reason`, which is
+  tuple-level (`category|actor_bucket`) and marks an arbitrary first row
+  per patrol as `window_expired`.
+- **Banner** — health only. Iff `[notify] outlet_digest` (default true)
+  and at least one health condition holds (patrol missed, dep-audit
+  missed, bulletin stale, degraded flag set), the digest routes **one**
+  call through `notify("digest", "watcher_health", <conditions joined>)`
+  under the `CATEGORIES["watcher_health"]` row (24h window, high, action
+  `fs-coil digest --show`). Because it goes through `notify()`, the usual
+  gates apply too — `outlet_nc`, `enabled`, cold start, and the 24h
+  novelty window on the `watcher_health|llmsnitch` tuple (a second
+  unhealthy day ledgers `window_repeat`, no re-page). Findings **never**
+  banner from the digest: the per-event gates already decided (D18
+  amended; the 20-rows/category threshold is dropped).
+- `fs_coil` never imports `llmsnitch`: producers stamp small JSON state
+  files under `~/.llmsnitch/` (respecting `LLMSNITCH_DIR`), the digest
+  reads them.
 
-### 4. TUI badge — `fs-coil dashboard`
+### 4. `fs-coil status` — degraded flag
 
-- New `fs_coil/render_notify.py` pane, following the existing `render_*.py`
-  module pattern and the dashboard's 5s refresh.
-- Shows: today's per-category counts, a mini-log tail of the last 5 ledger
-  rows, and — if the degraded flag is set — a `⚠ notifier degraded:
-  <reason>` line (D22). Colors reuse `fs_coil/theme.py` — critical → the
-  theme's error style (`err`), high → `_YELLOW`, suppressed/low → `_DIM`,
-  headers → `_C7`. No new colors.
-- `fs-coil status` additionally prints the degraded flag as a key-value row
-  (good=false styling) so the flag is visible without the dashboard.
+- `fs-coil status` prints the degraded flag as a key-value row (good=false
+  styling) so the flag is visible without any dashboard.
+- The TUI pane (`fs_coil/render_notify.py`, formerly outlet 4) is
+  **dropped** — ruled out of scope on the digest-outlet map (2026-09-14):
+  the digest file is how this user reviews, not the TUI.
 
 ## Migration plan
 
@@ -825,15 +851,23 @@ wrappers need no restart (invoked per-run).
 
 ### T007 — Delivery outlets + stopgap cleanup + docs
 
+**Executed by T601 (wayfinder/digest-outlet, 2026-09-14)** with these
+deviations from the text below, which is kept as history: the dashboard
+pane (`fs_coil/render_notify.py`) is **dropped** — out of scope on the
+digest-outlet map; `cmd_digest` lives in `fs_coil/digest.py` and the shared
+ledger reader in `fs_coil/ledger.py` (commands.py's 250-line cap); the
+`--date` override is replaced by an injectable clock on the Python API
+(tests call `cmd_digest(now=…)`, not a CLI flag); the banner rule is the
+health-only one in §3. The live-config `suppress_*` deletion and the
+`launchctl print` check are T602's (activate).
+
 - **Touch**: `fs_coil/commands.py` (`cmd_noise` reimplemented over the
   ledger; new `cmd_digest`; `cmd_prune` gains `--target notify|logs`;
   `cmd_status` prints the degraded flag), `fs_coil/cli.py` (dispatch +
-  USAGE for `digest` — including its `--date YYYY-MM-DD` override, used by
-  tests and ad-hoc reruns — `noise` flags, `prune --target`),
-  `fs_coil/dashboard.py` (mount the new pane).
-- **Create**: `fs_coil/render_notify.py`,
-  `~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist` (install
-  step, not a repo file — document the plist inline in the ticket).
+  USAGE for `digest`, `noise` flags, `prune --target`).
+- **Create**: `fs_coil/ledger.py`, `fs_coil/digest.py`; the digest
+  LaunchAgent plist is generated by `fs-coil digest --install-agent`
+  (print) / `--write` (install), mirroring `llmsnitch patrol`.
 - **Delete** (the T001 stopgap's remains — a manual live-config edit, the
   one step in this migration outside the repo): **every `suppress_*` key**
   (the stopgap's key shape — `suppress_claude_self` is the one known
@@ -843,21 +877,16 @@ wrappers need no restart (invoked per-run).
   code default and the layer runs correctly with the section empty or
   absent; the schema in this spec is what a user *may* add.
 - **Docs**: update the vendored `fs_coil/AGENTS.md` and repo `README.md`
-  (new commands, new config schema), add a pointer in repo `AGENTS.md` to
-  this spec.
+  (new commands), CLAUDE.md commands block.
 - **Done criteria**: `fs-coil noise` groups ledger rows; `fs-coil digest`
-  writes the digest file and honors the banner threshold both ways;
+  writes the digest file and banners on health conditions only;
   `fs-coil status` shows `degraded` when the flag is hand-set in the hot
-  state; dashboard renders the pane; `grep -rn "suppress_claude_self\|load_notify_suppress\|match_suppress\|_low_noise\|_should_emit\|_cooldown" fs_coil bin`
-  returns nothing (`self._last` is checked as part of `_should_emit`'s
-  removal); `grep -E "^\s*suppress_" ~/.config/llmsnitch/config` returns
-  nothing (the live-config half of the deletion, prefix-keyed — the repo
-  grep cannot see it); `launchctl print
-  gui/$(id -u)/com.slav-it.llmsnitch-digest` exits 0 (the digest agent
-  actually loaded); full test suite green.
-- **Test strategy**: fixture ledgers for noise/digest; a `--date` override
-  on `cmd_digest` for deterministic tests; render function returns strings —
-  assert on content, not curses.
+  state; `grep -E "^\s*suppress_" ~/.config/llmsnitch/config` returns
+  nothing (T602); `launchctl print gui/$(id -u)/com.slav-it.llmsnitch-digest`
+  exits 0 (T602); full test suite green.
+- **Test strategy**: synthetic fixture ledgers seeded via
+  `tests/_seams.seed_ledger` (never real subjects); injectable `now`;
+  render functions return strings — assert on content.
 
 ## Deferred: content-based digest (phase 2)
 
@@ -881,7 +910,7 @@ state):
 4. **Trigger**: yesterday's count fires an anomaly line iff
    `count > μ + 2σ` **and** `count ≥ 5`. The absolute floor stops σ≈0
    tuples (e.g. steady 1/day) from flapping on a single extra event.
-5. Anomaly lines render in digest section ④ as:
+5. Anomaly lines render as a fifth digest section after ④ (noisiest) as:
    `⚠ <tuple>: <count> events yesterday vs baseline <μ>±<σ>/day — action:
    fs-coil noise --category <cat> --days 2`.
 
@@ -920,6 +949,6 @@ Left open deliberately; neither blocks any migration ticket.
    `[agent.<name>] signing_ids = …` after running
    `codesign -dr - <app bundle>` on the installed app. Owner: user, as the
    agents get installed.
-2. **Digest LaunchAgent hour** — spec says 09:00; purely a taste knob the
-   user can edit in the plist. No config key for it in v1 (the plist IS the
-   config, matching the existing session-shed/agent-flick cadence pattern).
+2. **Digest LaunchAgent hour** — 10:00 (T601: after the 09:30 patrol,
+   so ① health can report that run). A taste knob the user edits in the
+   plist; no config key for it in v1 (the plist IS the config).
