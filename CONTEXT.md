@@ -164,6 +164,13 @@ gate that promotes an exploited-vulnerability finding to critical;
 `malicious` findings never wait for it.
 _Avoid_: reachable, invoked, used (vague)
 
+**Digest**:
+The once-daily rendered summary of the notify ledger's trailing 24 hours,
+always written to disk after the patrol and read at a time of the user's
+choosing; it banners only when the watchers themselves are unhealthy, never
+to re-page a finding.
+_Avoid_: report (taken by `scan --report`), summary email, daily alert
+
 **Waiver**:
 A user-granted exception silencing a specific dep-audit finding
 (advisory × package), carrying a reason, living until removed or the
