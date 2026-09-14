@@ -5,10 +5,12 @@ import os
 import sys
 
 from fs_coil.commands import (
-    cmd_logs, cmd_noise, cmd_prune, cmd_restart, cmd_start, cmd_status,
-    cmd_stop, cmd_test,
+    cmd_logs, cmd_prune, cmd_restart, cmd_start, cmd_status, cmd_stop,
+    cmd_test,
 )
 from fs_coil.dashboard import cmd_dashboard
+from fs_coil.digest import cmd_digest
+from fs_coil.ledger import cmd_noise
 from fs_coil.monitor import run_monitor
 from fs_coil.report import cmd_report
 from fs_coil.theme import print_banner
@@ -25,10 +27,17 @@ Usage:
   fs-coil stop           unload LaunchDaemon (sudo)
   fs-coil restart        stop + start
   fs-coil logs [-f]      show today's log (-f = tail follow)
-  fs-coil noise [--category X] [--days N]
-                         show writes that were logged but suppressed from
-                         notifications ("actionable, not informational")
-  fs-coil prune [--days N]  delete daily logs older than N days (default 30)
+  fs-coil digest [--full] [--show] [--prune]
+                         write today's digest of the notify ledger (trailing
+                         24h): health, new since last digest, counts, noisiest
+  fs-coil digest --install-agent [--write]
+                         print/install the 10:00 digest LaunchAgent
+  fs-coil noise [--category X] [--actor B] [--days N] [--all]
+                         ledger recall: rows that were logged but not paged
+                         (--all includes paged), grouped by category · actor
+  fs-coil prune [--target logs|notify] [--days N]
+                         delete dated files older than N days — logs (default,
+                         30 days) or the notify ledger + digests (45 days)
   fs-coil test           run foreground (deep mode), no notifications
   fs-coil daemon         internal, invoked by launchd (deep mode, root)
 """
@@ -97,9 +106,17 @@ def main():
         cmd_logs(follow=("-f" in argv[1:]))
     elif c == "noise":
         cmd_noise(category=_opt(rest, "--category"),
-                  days=max(1, _opt(rest, "--days", 1, int)))
+                  actor=_opt(rest, "--actor"),
+                  days=max(1, _opt(rest, "--days", 1, int)),
+                  all_rows=("--all" in rest))
     elif c == "prune":
-        cmd_prune(days=max(1, _opt(rest, "--days", 30, int)))
+        cmd_prune(days=_opt(rest, "--days", None, int),
+                  target=_opt(rest, "--target"))
+    elif c == "digest":
+        sys.exit(cmd_digest(full=("--full" in rest), show=("--show" in rest),
+                            prune=("--prune" in rest),
+                            install_agent=("--install-agent" in rest),
+                            write=("--write" in rest)))
     elif c == "test":
         cmd_test()
     elif c == "daemon":

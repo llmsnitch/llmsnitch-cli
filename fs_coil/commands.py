@@ -40,6 +40,9 @@ def cmd_status():
     user = console_user() or "(none)"
     home = user_home(user) if user != "(none)" else "~"
 
+    from fs_coil import notify as _notify
+    reason = _notify.get_degraded()
+
     head("fs-coil status")
     def _kv(k, v, good=True):
         c = _GREEN if good else _YELLOW
@@ -47,11 +50,12 @@ def cmd_status():
             print(f"{_C7}{_TREE_MID}{_R} {_DIM}{k:<9}{_R} {c}{v}{_R}")
         else:
             print(f"  {k:<9} {v}")
-    _kv("plist",   str(PLIST_PATH),  PLIST_PATH.exists())
-    _kv("binary",  str(BIN_PATH),    BIN_PATH.exists())
-    _kv("daemon",  "loaded" if loaded else "not loaded", loaded)
-    _kv("user",    user, user != "(none)")
-    _kv("log dir", f"{home}/Library/Logs/llmsnitch/fs-coil")
+    _kv("plist",    str(PLIST_PATH),  PLIST_PATH.exists())
+    _kv("binary",   str(BIN_PATH),    BIN_PATH.exists())
+    _kv("daemon",   "loaded" if loaded else "not loaded", loaded)
+    _kv("user",     user, user != "(none)")
+    _kv("log dir",  f"{home}/Library/Logs/llmsnitch/fs-coil")
+    _kv("degraded", reason or "none", good=reason is None)
 
 
 def cmd_start():
@@ -130,104 +134,80 @@ def cmd_logs(follow=False):
             pass
 
 
-def cmd_prune(days=30):
-    """Delete daily log files older than `days`. The audit log accumulates
-    forever otherwise — it's the full list of every secret path touched, so
-    unbounded retention is a standing liability (GDPR storage-limitation +
-    breach blast-radius). Parses the YYYY-MM-DD stamp in each filename."""
-    if days < 1:
-        err("prune: --days must be >= 1")
-        sys.exit(1)
-    user = console_user() or pwd.getpwuid(os.getuid()).pw_name
-    home = user_home(user)
-    log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
-    if not log_dir.is_dir():
-        warn(f"no log dir at {log_dir}")
-        return
+def _prune_dated(dir_path, name_re, days, label):
+    """Delete regular non-symlink files in dir_path whose name matches name_re
+    and whose embedded YYYY-MM-DD stamp is older than `days` days.
+    No recursion, no symlink following. Returns count of removed files.
+    # ponytail: ceiling is one dir level only — subdirs and symlinks always skip
+    """
+    import re as _re
+    dir_p = Path(dir_path)
+    if not dir_p.is_dir():
+        warn(f"no {label} dir at {dir_p}")
+        return 0
     cutoff = datetime.now().date() - timedelta(days=days)
+    pat = _re.compile(name_re)
     removed = 0
-    for f in sorted(log_dir.glob("fs-coil-*.log")):
-        stamp = f.stem[len("fs-coil-"):]
+    try:
+        entries = sorted(dir_p.iterdir())
+    except OSError:
+        return 0
+    for f in entries:
+        if not pat.match(f.name):
+            continue
+        if os.path.islink(str(f)):   # never follow or remove symlinks
+            continue
+        if not f.is_file():          # skip subdirs
+            continue
+        m = _re.search(r"(\d{4}-\d{2}-\d{2})", f.name)
+        if not m:
+            continue
         try:
-            fdate = datetime.strptime(stamp, "%Y-%m-%d").date()
+            fdate = datetime.strptime(m.group(1), "%Y-%m-%d").date()
         except ValueError:
-            continue  # unrecognized name — leave it alone
+            continue
         if fdate < cutoff:
             try:
                 f.unlink()
                 removed += 1
             except OSError as e:
                 warn(f"could not remove {f.name}: {e}")
-    ok(f"pruned {removed} log file(s) older than {days} day(s)")
+    return removed
 
 
-def cmd_noise(category=None, days=1):
-    """Display suppressed-but-logged deny matches (things we chose NOT to
-    page you about). Groups by category and shows counts + recent paths.
+def cmd_prune(days=None, target=None):
+    """Delete dated files older than `days` for the given target.
 
-    --category=NAME     show only that category (default: all)
-    --days=N            look back N days of logs (default 1 = today only)
+    target None or 'logs'   → fs-coil log dir,   default 30 days
+    target 'notify'         → ledger/digest dir,  default 45 days
     """
-    import re as _re
-    from collections import defaultdict
-    user = console_user() or pwd.getpwuid(os.getuid()).pw_name
-    home = user_home(user)
-    log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
-    if not log_dir.is_dir():
-        warn(f"no log dir at {log_dir}")
-        return
-    cutoff = datetime.now().date() - timedelta(days=max(0, days - 1))
-    logs = []
-    for f in sorted(log_dir.glob("fs-coil-*.log")):
-        stamp = f.stem[len("fs-coil-"):]
-        try:
-            fdate = datetime.strptime(stamp, "%Y-%m-%d").date()
-        except ValueError:
-            continue
-        if fdate >= cutoff:
-            logs.append(f)
-    if not logs:
-        warn(f"no logs in the last {days} day(s)")
-        return
+    if target is None or target == "logs":
+        _days = days if days is not None else 30
+        if _days < 1:
+            err("prune: --days must be >= 1")
+            sys.exit(1)
+        user = console_user() or pwd.getpwuid(os.getuid()).pw_name
+        home = user_home(user)
+        log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
+        n = _prune_dated(str(log_dir),
+                         r"^fs-coil-\d{4}-\d{2}-\d{2}\.log$",
+                         _days, "logs")
+        ok(f"pruned {n} logs file(s) older than {_days} day(s)")
+    elif target == "notify":
+        _days = days if days is not None else 45
+        if _days < 1:
+            err("prune: --days must be >= 1")
+            sys.exit(1)
+        from fs_coil import ledger
+        notify_dir = ledger.ledger_dir()
+        n = _prune_dated(notify_dir,
+                         r"^(events|digest)-\d{4}-\d{2}-\d{2}\.(ndjson|txt)$",
+                         _days, "notify")
+        ok(f"pruned {n} notify file(s) older than {_days} day(s)")
+    else:
+        err(f"unknown prune target: {target!r} (use 'logs' or 'notify')")
+        sys.exit(1)
 
-    line_re = _re.compile(
-        r"^\[(?P<ts>[^\]]+)\] DENY-MATCH .* path=(?P<path>.+?) "
-        r"pattern=(?P<pattern>\S+) suppressed=(?P<cat>\S+)$"
-    )
-    by_cat = defaultdict(list)
-    for f in logs:
-        try:
-            for raw in f.read_text().splitlines():
-                m = line_re.match(raw)
-                if not m:
-                    continue
-                if category and m.group("cat") != category:
-                    continue
-                by_cat[m.group("cat")].append(
-                    (m.group("ts"), m.group("path"), m.group("pattern")))
-        except OSError:
-            continue
-
-    print_banner()
-    head(f"suppressed events (last {days} day{'s' if days != 1 else ''})")
-    if not by_cat:
-        item("nothing suppressed in this window — "
-             "add [notify] suppress_<name> = <glob> to ~/.config/llmsnitch/config")
-        return
-    for cat in sorted(by_cat):
-        entries = by_cat[cat]
-        item(f"{cat}: {len(entries)} event(s)")
-        for ts, path, pattern in entries[-10:]:
-            if _tty():
-                print(f"    {_DIM}{ts}{_R}  {path}  {_DIM}rule={pattern}{_R}")
-            else:
-                print(f"    {ts}  {path}  rule={pattern}")
-        if len(entries) > 10:
-            more = len(entries) - 10
-            if _tty():
-                print(f"    {_DIM}… {more} older event(s) not shown{_R}")
-            else:
-                print(f"    ... {more} older event(s) not shown")
 
 
 def cmd_test():

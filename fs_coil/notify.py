@@ -45,6 +45,7 @@ CATEGORIES = {
     "threshold_breach":       ("0",   "high", "review the session; kill the runaway session"),
     "scan_finding":           ("24h", "high", "review the findings: llmsnitch scan --report"),
     "depaudit_finding":       ("24h", "critical", "uninstall if unexpected; detail: llmsnitch depaudit"),
+    "watcher_health":         ("24h", "high", "check the watchers: fs-coil digest --show"),
 }
 
 _SURFACE_SECTION = {          # fixed surface -> config-section map

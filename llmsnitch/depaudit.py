@@ -270,6 +270,21 @@ def add_waiver(adv_id, package, reason, out):
     return 0
 
 
+def _stamp_state(meta, findings, note):
+    """Health stamp the digest reads (fs_coil never imports us). A failed
+    stamp never changes the exit code."""
+    try:
+        store._mkdir_private(store.base_dir())
+        p = store.base_dir() / "depaudit-state.json"
+        p.write_text(json.dumps({
+            "ts": store.now(), "bulletin_age_days": meta.get("bulletin_age_days"),
+            "intakes": meta.get("intakes"), "envs": meta.get("envs"),
+            "findings": len(findings), "note": note}))
+        store._chmod_private(p)
+    except OSError:
+        pass
+
+
 # -- the audit ----------------------------------------------------------------
 
 def run_audit():
@@ -432,6 +447,7 @@ def cmd_depaudit(argv, out):
         # operational, never as a breach, and never as a clean pass.
         out.write(f"[ERROR] audit failed: {type(e).__name__}\n")
         return 2
+    _stamp_state(meta, findings, note)
     if note:
         out.write(f"[ERROR] {note} — run the weekly refresh (T508) or check "
                   f"{bulletin.default_path()}\n")
