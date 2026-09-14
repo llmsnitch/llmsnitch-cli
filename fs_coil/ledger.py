@@ -155,7 +155,7 @@ def cmd_noise(category=None, actor=None, days=1, all_rows=False, *,
         rows_in_group = groups[(cat, act)]
         item(f"{cat} · {act}: {len(rows_in_group)} row(s)")
         for r in rows_in_group[-10:]:
-            ts_str = datetime.fromtimestamp(r["ts"]).strftime("%H:%M:%S")
+            ts_str = datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M:%S")
             subj = r.get("subject", "")
             act_b = r.get("actor_bucket", "unknown")
             nov = r.get("novelty_reason", "")

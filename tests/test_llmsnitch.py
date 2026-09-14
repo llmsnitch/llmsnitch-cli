@@ -15,6 +15,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from llmsnitch import gate, hook, setup_cmd, store, transcript  # noqa: E402
+from tests._seams import with_tmp  # noqa: E402
 
 SECRET = "sk-abcdefghijklmnop1234"
 
@@ -25,16 +26,12 @@ def _payload(event, sid="s1", **kw):
 
 
 def _with_tmp_store(fn):
-    with tempfile.TemporaryDirectory() as t:
-        old = os.environ.get("LLMSNITCH_DIR")
-        os.environ["LLMSNITCH_DIR"] = t
-        try:
-            fn(Path(t))
-        finally:
-            if old is None:
-                os.environ.pop("LLMSNITCH_DIR", None)
-            else:
-                os.environ["LLMSNITCH_DIR"] = old
+    """LLMSNITCH_DIR plus the notify seams: scan tests route findings
+    through notify() and must never land in the real ledger / hot state."""
+    def body(t, _delivered, _errors):
+        (t / "store").mkdir()
+        fn(t / "store")
+    with_tmp(body, store=True)
 
 
 def test_hook_records_and_redacts():
