@@ -52,6 +52,35 @@ def state(t):
     return json.loads((t / "cache" / "notify-state.json").read_text())
 
 
+def row(ts, category, subject, actor_bucket="unknown", **kw):
+    """One synthetic v1 ledger row (docs/notifier-spec.md "Row schema").
+    Never a real subject — fixtures are invented. kw overrides any key."""
+    r = {"v": 1, "ts": float(ts), "surface": "config-audit",
+         "category": category, "actor_bucket": actor_bucket,
+         "subject": subject, "severity": nf.CATEGORIES[category][1],
+         "first_seen_ts": float(ts), "count_in_window": 1,
+         "novelty_reason": "window_repeat", "notified": False}
+    r.update(kw)
+    return r
+
+
+def seed_ledger(t, rows):
+    """Append rows (dicts, or raw str lines for garbage tests) to
+    t/notify/events-YYYY-MM-DD.ndjson by each row's ts — 0700 dir, 0600 files."""
+    from datetime import datetime
+    d = t / "notify"
+    d.mkdir(mode=0o700, exist_ok=True)
+    for r in rows:
+        if isinstance(r, str):
+            stamp, line = r.split("|", 1) if "|" in r else \
+                (datetime.now().strftime("%Y-%m-%d"), r)
+        else:
+            stamp, line = datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d"), json.dumps(r)
+        f = d / f"events-{stamp}.ndjson"
+        with open(os.open(f, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600), "a") as fh:
+            fh.write(line + "\n")
+
+
 def run(globs):
     """Run every test_* in globs; print PASS/FAIL lines; return exit code."""
     tests = sorted((v for k, v in globs.items()
