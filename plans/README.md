@@ -22,7 +22,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 008 | fs_coil: icon-key sanitizer + log create-0600 | P3 | S | 004 | DONE |
 | 009 | Guard-branch tests (cli dispatch, walk guards, patrol, alien ledger, pattern composition) | P2 | M | 004; after 005–007 if queued | DONE |
 | 010 | Ship the `fs-coil` entry point | P3 | S | 004 | DONE |
-| 011 | Unattested-agent discovery (close coverage gap) | P2 | M | — | DONE (steps 1–6; step 7 decision-gated) |
+| 011 | Unattested-agent discovery (close coverage gap) | P2 | M | — | DONE (steps 1–6; step 7 REJECTED — see notes) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 
@@ -40,9 +40,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rational
   of the rest. Written at commit `53b1ab4` (2026-09-09), prompted by the
   "Bari AI" coverage-gap incident and grounded in
   `docs/research/scanner-survey-mvp.md` §2.1/§2.2/§2.5. Steps 1–6 are the
-  low-risk core; Step 7 (cold-start banner) is a decision-gated follow-on
-  that touches `fs_coil/notify.py` — do not start it without maintainer
-  sign-off.
+  low-risk core. Step 7 (cold-start banner) was **rejected by the
+  maintainer 2026-09-14**: an unattested-agent finding must not interrupt
+  the user's task; it stays a quiet-by-design `scan_finding`, reviewed at a
+  time of the user's choosing after the daily patrol (and in the digest
+  once that outlet exists). Do not build it.
 
 ## Findings considered and rejected
 
