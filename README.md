@@ -50,6 +50,19 @@ llmsnitch scan             # config-audit over agent artifacts
 llmsnitch patrol           # print/--write the daily-scan LaunchAgent
 ```
 
+The notify layer's read side (`fs-coil`, installed alongside):
+
+```bash
+fs-coil digest              # write today's digest of the notify ledger (trailing 24h)
+fs-coil digest --show       # print the newest digest
+fs-coil digest --install-agent [--write]   # print/install the 10:00 digest LaunchAgent
+fs-coil noise [--category X] [--actor B] [--days N] [--all]   # ledger recall, grouped
+fs-coil prune --target notify [--days N]   # ledger + digest retention (default 45 days)
+fs-coil status              # daemon + notifier degraded flag
+```
+
+The digest is written to `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt` after the 09:30 patrol. It banners only when the watchers themselves are unhealthy (patrol missed, dep-audit missed, bulletin stale, notifier degraded) — never to re-page a finding. `[notify] outlet_digest = false` silences that banner; the file is always written.
+
 Patrol logs live at `~/Library/Logs/llmsnitch/patrol.{out,err}`.
 
 Thresholds in `~/.config/llmsnitch/config`:

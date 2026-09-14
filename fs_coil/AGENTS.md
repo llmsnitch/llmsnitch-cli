@@ -9,3 +9,6 @@ Hard constraints (from the security audit — do not regress):
 - Notifier dedupe key must NOT contain a timestamp (breaks the 60s cooldown).
 - Subprocess: list-form argv only, never `shell=True`.
 - `_low_noise` trusts the OS signing-id prefix, not a `/claude.app/` path substring (spoofable).
+- `fs_coil` never imports `llmsnitch`. Producers stamp health state files under `~/.llmsnitch/` (scan `meta.json`, `depaudit-state.json`); `digest.py` only reads them. `ledger.py` treats the NDJSON ledger as hostile input — skip and count, never raise.
+
+Read-side modules: `ledger.py` (shared ledger reader, `fs-coil noise`), `digest.py` (daily digest, health banner, its LaunchAgent).

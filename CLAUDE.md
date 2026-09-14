@@ -25,6 +25,7 @@ These are enforced by `tests/test_llmsnitch.py` — a change that breaks any of 
 
 Two packages ship in the wheel: `llmsnitch` (15 modules) and
 `fs_coil` (the notify layer — the scan's finding routing imports it).
+`fs_coil/ledger.py` and `fs_coil/digest.py` are the notify layer's read side (digest outlet, `wayfinder/digest-outlet/map.md`).
 
 - `cli.py` — argparse-free dispatch. `hook <event>` is the hot path; everything else is human-facing.
 - `hook.py` — reads one Claude Code hook payload from stdin, redacts, appends one NDJSON line. On `Stop`, folds transcript usage into `meta.json`.
@@ -50,6 +51,8 @@ llmsnitch setup                        # print hooks block
 llmsnitch setup --write                # install (from a plain terminal, not inside CC)
 llmsnitch list | show <id> | check     # read-side
 LLMSNITCH_DIR=/tmp/foo llmsnitch …     # override base dir (used by tests)
+fs-coil digest [--show|--full|--prune|--install-agent]   # daily digest of the notify ledger
+fs-coil noise | prune --target notify | status           # ledger recall, retention, degraded flag
 ```
 
 Run one test: there is no framework, just call it — `python3 -c "from tests.test_llmsnitch import test_hook_records_and_redacts as t; t()"`.
