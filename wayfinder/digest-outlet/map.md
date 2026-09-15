@@ -66,6 +66,13 @@ the degraded flag. The map closes when
   digest; **phase-2 anomaly section** = fog until 30+ days of ledger;
   **vocabulary** = add **Digest** only (no "digest window" — say trailing
   24h).
+- [T601 — Build the digest outlet](tickets/T601-build-digest-outlet.md) —
+  built and live-verified from the repo entry point: `fs-coil digest`
+  (health / new / counts / noisiest, 0600 file, health-only banner via
+  `watcher_health`), `ledger.py` reader, `noise` over the ledger, `prune
+  --target notify`, `status` degraded line, `digest --install-agent`; spec
+  amended first; suite 135 → 174; three review gates applied. Not
+  installed — T602 activates.
 
 ## Not yet specified
 
