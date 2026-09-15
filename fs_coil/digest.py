@@ -10,7 +10,6 @@ fs_coil never imports llmsnitch: producers stamp state files under
 import glob
 import json
 import os
-import re
 import sys
 import time
 from collections import Counter
@@ -18,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fs_coil import ledger, notify
+from fs_coil.ledger import clean
 from fs_coil.digest_agent import install_agent_run
 
 PATROL_MAX_AGE = DEPAUDIT_MAX_AGE = 26 * 3600
@@ -25,7 +25,6 @@ BULLETIN_MAX_AGE_DAYS = 14
 LOOKBACK = 7 * 86400
 _CAP = 20                      # ② subjects on one screen; --full lifts it
 _TIERS = ("critical", "high", "lesser")
-_CTRL = re.compile(r"[\x00-\x1f\x7f]")   # ledger subjects are hostile input
 _FIX = {"patrol": "launchctl kickstart gui/$(id -u)/com.slav-it.llmsnitch-patrol",
         "dep-audit": "llmsnitch depaudit",
         "bulletin": "refresh the bulletin cache (docs/bulletin-spec.md)",
@@ -72,7 +71,7 @@ def health_report(now=None):
     if age is None or age > BULLETIN_MAX_AGE_DAYS:
         problems.append(f"bulletin stale ({'unknown' if age is None else f'{age:.0f}d'})")
     if degraded:
-        problems.append(f"notifier degraded: {degraded}")
+        problems.append(f"notifier degraded: {clean(degraded)}")
     return {"now": now, "patrol_ts": patrol, "depaudit_ts": dep_ts,
             "bulletin_age_days": age, "degraded": degraded, "problems": problems}
 
@@ -97,16 +96,14 @@ def _fmt(ts):
     return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
 
 
-def _clean(s):
-    return _CTRL.sub(" ", str(s))
-
-
-def render(window, before, previous, health, *, start_ts, end_ts,
+def render(window, lookback, prior, health, *, start_ts, end_ts,
            full=False, skipped=0):
-    """Plain text, four sections. New/known/resolved are SUBJECT-level, from
-    row presence across windows — novelty_reason is tuple-level, not used."""
-    seen = {_key(r) for r in before}
-    prev = {_key(r) for r in previous}
+    """Plain text, four sections. window = [start, end); lookback = the 7
+    days before start (new vs known); prior = the equal-length window just
+    before start (resolved). Subject-level, from row presence — novelty_reason
+    is tuple-level and not used."""
+    seen = {_key(r) for r in lookback}
+    prev = {_key(r) for r in prior}
     first = {}
     for r in window:
         first.setdefault(_key(r), r)
@@ -141,7 +138,7 @@ def render(window, before, previous, health, *, start_ts, end_ts,
             last = (t, cat, act)
             L += [f"  [{_TIERS[t].upper()}] {cat} · {act}",
                   f"    → action: {notify.CATEGORIES.get(cat, ('', '', '-'))[2]}"]
-        L.append(f"    {_clean(sub)}")
+        L.append(f"    {clean(sub)}")
     if not items:
         L.append("  nothing new")
 
@@ -155,7 +152,7 @@ def render(window, before, previous, health, *, start_ts, end_ts,
                  f"{len({k for k in resolved if k[:2] == tup})}")
 
     L += ["", "④ noisiest subjects"]
-    L += [f"  {n}  {_clean(s)}" for s, n in
+    L += [f"  {n}  {clean(s)}" for s, n in
           Counter(r["subject"] for r in window).most_common(5)] or ["  (no rows)"]
     return "\n".join(L) + "\n"
 
@@ -183,15 +180,15 @@ def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
     if not end - LOOKBACK <= start < end:     # missed days widen, capped;
         start = max(end - LOOKBACK, min(start, end - 86400))   # future mtime → 24h
     window, skipped = ledger.iter_rows(start, end)
-    before, _ = ledger.iter_rows(start - LOOKBACK, start)
-    previous = [r for r in before if r["ts"] >= start - (end - start)]
+    lookback, _ = ledger.iter_rows(start - LOOKBACK, start)
+    prior = [r for r in lookback if r["ts"] >= start - (end - start)]
     health = health_report(end)
-    text = render(window, before, previous, health, start_ts=start,
+    text = render(window, lookback, prior, health, start_ts=start,
                   end_ts=end, full=full, skipped=skipped)
 
     notify._mkdir_owned(d, 0o700)
     path = os.path.join(d, f"digest-{today}.txt")
-    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600),
                    "w") as f:
         f.write(text)
     os.chmod(path, 0o600)

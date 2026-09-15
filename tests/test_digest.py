@@ -86,11 +86,11 @@ def test_health_missing_or_corrupt_files_never_raise():
 
 # ---------------------------------------------------------------- render
 
-def _render(window, before=(), previous=(), full=False, **hkw):
+def _render(window, lookback=(), prior=(), full=False, **hkw):
     h = {"now": T0, "patrol_ts": T0 - H, "depaudit_ts": T0 - H,
          "bulletin_age_days": 1.0, "degraded": None, "problems": []}
     h.update(hkw)
-    return digest.render(list(window), list(before), list(previous), h,
+    return digest.render(list(window), list(lookback), list(prior), h,
                          start_ts=T0 - D, end_ts=T0, full=full)
 
 
@@ -103,7 +103,7 @@ def test_render_sections_tiers_and_classification():
               row(T0 - 2 * H, "scan_finding", "known_thing: ~/k", "claude-code")]
     before = [row(T0 - 2 * D, "scan_finding", "known_thing: ~/k", "claude-code"),
               row(T0 - 2 * D, "scan_finding", "gone_thing: ~/g", "claude-code")]
-    text = _render(window, before, previous=before)
+    text = _render(window, before, prior=before)
     for h in ("① health", "② new since last digest (3)",
               "③ counts (category · actor: rows  new/known/resolved)",
               "④ noisiest subjects", "  → all watchers healthy"):

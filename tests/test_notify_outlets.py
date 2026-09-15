@@ -104,7 +104,7 @@ def test_iter_rows_missing_dir():
     from fs_coil import ledger
 
     result, skipped = ledger.iter_rows(T0, T0 + 1,
-                                        dir="/nonexistent/path/that/cannot/exist")
+                                        dir_path="/nonexistent/path/that/cannot/exist")
     assert result == []
     assert skipped == 0
 
@@ -512,6 +512,18 @@ def test_cmd_status_no_degraded_shows_none():
         assert "none" in out
 
     with_tmp(body)
+
+
+def test_cmd_noise_strips_control_chars():
+    def body(t, delivered, errors):
+        from fs_coil import ledger
+        seed_ledger(t, [row(T0, "scan_finding", "evil\x1b[2Jrule: ~/z")])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ledger.cmd_noise(now=T0 + 1)
+        assert "\x1b" not in buf.getvalue() and "evil [2Jrule" in buf.getvalue()
+    with_tmp(body)
+
 
 
 if __name__ == "__main__":

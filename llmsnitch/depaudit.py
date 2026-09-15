@@ -276,10 +276,11 @@ def _stamp_state(meta, findings, note):
     try:
         store._mkdir_private(store.base_dir())
         p = store.base_dir() / "depaudit-state.json"
-        p.write_text(json.dumps({
-            "ts": store.now(), "bulletin_age_days": meta.get("bulletin_age_days"),
-            "intakes": meta.get("intakes"), "envs": meta.get("envs"),
-            "findings": len(findings), "note": note}))
+        with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+            fh.write(json.dumps({
+                "ts": store.now(), "bulletin_age_days": meta.get("bulletin_age_days"),
+                "intakes": meta.get("intakes"), "envs": meta.get("envs"),
+                "findings": len(findings), "note": note}))
         store._chmod_private(p)
     except OSError:
         pass

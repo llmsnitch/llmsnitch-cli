@@ -64,13 +64,13 @@ def row(ts, category, subject, actor_bucket="unknown", **kw):
     return r
 
 
-def seed_ledger(t, rows):
+def seed_ledger(t, items):
     """Append rows (dicts, or raw str lines for garbage tests) to
     t/notify/events-YYYY-MM-DD.ndjson by each row's ts — 0700 dir, 0600 files."""
     from datetime import datetime
     d = t / "notify"
     d.mkdir(mode=0o700, exist_ok=True)
-    for r in rows:
+    for r in items:
         if isinstance(r, str):
             stamp, line = r.split("|", 1) if "|" in r else \
                 (datetime.now().strftime("%Y-%m-%d"), r)

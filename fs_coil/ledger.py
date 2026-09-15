@@ -2,7 +2,7 @@
 
 Public API:
   ledger_dir() -> str
-  iter_rows(start_ts, end_ts, *, dir=None) -> tuple[list[dict], int]
+  iter_rows(start_ts, end_ts, *, dir_path=None) -> tuple[list[dict], int]
   cmd_noise(category=None, actor=None, days=1, all_rows=False, *, now=None) -> None
 
 Stdlib only. No network. Never raises to the caller.
@@ -15,6 +15,13 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 _FILE_RE = re.compile(r"^events-(\d{4}-\d{2}-\d{2})\.ndjson$")
+_CTRL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def clean(s):
+    """Ledger subjects are hostile input (root-observed paths): never let
+    a control sequence reach a terminal or the digest file."""
+    return _CTRL.sub(" ", str(s))
 
 
 # ---------------------------------------------------------------- public API
@@ -25,7 +32,7 @@ def ledger_dir() -> str:
     return _notify_dir()
 
 
-def iter_rows(start_ts, end_ts, *, dir=None):
+def iter_rows(start_ts, end_ts, *, dir_path=None):
     """Return (rows, skipped_count).
 
     Rows where start_ts <= row["ts"] < end_ts, sorted ascending by ts.
@@ -36,7 +43,7 @@ def iter_rows(start_ts, end_ts, *, dir=None):
     skipped and counted in the second return value.
     Missing dir or file -> ([], 0).
     """
-    d = dir if dir is not None else ledger_dir()
+    d = dir_path if dir_path is not None else ledger_dir()
     if not os.path.isdir(d):
         return ([], 0)
 
@@ -156,7 +163,7 @@ def cmd_noise(category=None, actor=None, days=1, all_rows=False, *,
         item(f"{cat} · {act}: {len(rows_in_group)} row(s)")
         for r in rows_in_group[-10:]:
             ts_str = datetime.fromtimestamp(r["ts"]).strftime("%m-%d %H:%M:%S")
-            subj = r.get("subject", "")
+            subj = clean(r.get("subject", ""))
             act_b = r.get("actor_bucket", "unknown")
             nov = r.get("novelty_reason", "")
             if _tty():
