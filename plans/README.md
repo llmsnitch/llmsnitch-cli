@@ -23,6 +23,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 009 | Guard-branch tests (cli dispatch, walk guards, patrol, alien ledger, pattern composition) | P2 | M | 004; after 005–007 if queued | DONE |
 | 010 | Ship the `fs-coil` entry point | P3 | S | 004 | DONE |
 | 011 | Unattested-agent discovery (close coverage gap) | P2 | M | — | DONE (steps 1–6; step 7 REJECTED — see notes) |
+| 012 | Digest finding-recall (standing open-findings readout) | P2 | M | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 
@@ -45,6 +46,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rational
   the user's task; it stays a quiet-by-design `scan_finding`, reviewed at a
   time of the user's choosing after the daily patrol (and in the digest
   once that outlet exists). Do not build it.
+- 012 is independent. Written at `15727b2` (2026-09-15), direction picked by
+  the maintainer after the digest outlet + dep-audit landed. Delivers the
+  standing-findings recall that 011's rejection note and the scan-rollout /
+  dep-audit map fog both pointed at the digest to carry. Pull-only: it adds
+  a state-file readout, never a banner — do not route it through `notify()`.
 
 ## Findings considered and rejected
 
