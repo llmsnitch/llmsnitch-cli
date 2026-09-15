@@ -98,12 +98,14 @@ def test_prune_cli_target_notify_and_bad_target():
 
 
 def test_digest_install_agent_prints_plist():
+    plist = Path("~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist").expanduser()
+    before = plist.stat().st_mtime if plist.exists() else None
     r = _cli("digest", "--install-agent")
     assert r.returncode == 0, r.stderr
     assert "com.slav-it.llmsnitch-digest" in r.stdout
     assert "<integer>10</integer>" in r.stdout and "--prune" in r.stdout
-    assert not Path("~/Library/LaunchAgents/com.slav-it.llmsnitch-digest.plist"
-                    ).expanduser().exists()   # print-only never installs
+    after = plist.stat().st_mtime if plist.exists() else None
+    assert before == after   # print-only never writes or rewrites the plist
 
 
 def test_usage_lists_new_commands():
