@@ -134,11 +134,11 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
         if i >= _CAP and not full:
             L.append(f"  … {len(items) - i} more (fs-coil digest --full)")
             break
-        if (t, cat, act) != last:
-            last = (t, cat, act)
-            L += [f"  [{_TIERS[t].upper()}] {cat} · {act}",
+        if (t, cat) != last:               # decision line once per category group
+            last = (t, cat)
+            L += [f"  [{_TIERS[t].upper()}] {cat}",
                   f"    → action: {notify.CATEGORIES.get(cat, ('', '', '-'))[2]}"]
-        L.append(f"    {clean(sub)}")
+        L.append(f"    {act} · {clean(sub)}")
     if not items:
         L.append("  nothing new")
 

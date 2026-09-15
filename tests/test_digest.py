@@ -112,6 +112,8 @@ def test_render_sections_tiers_and_classification():
     assert sec2.index("[CRITICAL]") < sec2.index("[HIGH]") < sec2.index("[LESSER]"), sec2
     assert "known_thing" not in sec2, sec2                     # known never listed
     assert sec2.count("→ action: review the findings: llmsnitch scan --report") == 2
+    assert "    unknown · critical hook_curl: ~/x" in sec2, sec2   # actor on the line
+    assert "[HIGH] scan_finding\n" in sec2                        # not in the header
     assert "→ action: uninstall if unexpected; detail: llmsnitch depaudit" in sec2
     sec3 = text.split("③ counts")[1].split("④")[0]
     assert "  scan_finding · claude-code  3  1/1/1" in sec3, sec3   # new/known/resolved
