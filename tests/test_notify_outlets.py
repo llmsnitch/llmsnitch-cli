@@ -16,6 +16,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from fs_coil import notify as nf                            # noqa: E402
+from fs_coil import ledger                                  # noqa: E402
+from fs_coil.ledger import cmd_noise                        # noqa: E402
+import fs_coil.commands as cmd_mod                          # noqa: E402
 from tests._seams import with_tmp, row, seed_ledger, run   # noqa: E402
 
 T0 = 1_755_600_000.0   # fixed epoch — 2025-08-19 (local); use now= everywhere
@@ -38,7 +41,6 @@ def _date_of(ts):
 
 def test_iter_rows_two_files_ascending():
     """iter_rows reads across two daily files and returns rows in ts order."""
-    from fs_coil import ledger
 
     def body(t, delivered, errors):
         day1 = T0
@@ -63,7 +65,6 @@ def test_iter_rows_two_files_ascending():
 
 def test_iter_rows_date_span_filter():
     """iter_rows reads only files within [date(start)-1d, date(end)+1d]."""
-    from fs_coil import ledger
 
     def body(t, delivered, errors):
         old_ts = T0 - 4 * 86400   # 4 days before T0
@@ -82,7 +83,6 @@ def test_iter_rows_date_span_filter():
 
 def test_iter_rows_start_end_exclusive():
     """start_ts is inclusive, end_ts is exclusive."""
-    from fs_coil import ledger
 
     def body(t, delivered, errors):
         seed_ledger(t, [
@@ -101,7 +101,6 @@ def test_iter_rows_start_end_exclusive():
 
 def test_iter_rows_missing_dir():
     """Missing notify dir returns ([], 0) without raising."""
-    from fs_coil import ledger
 
     result, skipped = ledger.iter_rows(T0, T0 + 1,
                                         dir_path="/nonexistent/path/that/cannot/exist")
@@ -109,90 +108,29 @@ def test_iter_rows_missing_dir():
     assert skipped == 0
 
 
-def test_iter_rows_hostile_invalid_json():
-    """Invalid JSON lines are skipped and counted."""
-    from fs_coil import ledger
-
+def test_iter_rows_hostile_lines_skipped_and_counted():
+    """Invalid JSON, non-dict JSON, missing/non-numeric ts, missing subject or
+    category: every garbage line is skipped and counted, good rows survive."""
     def body(t, delivered, errors):
         stamp = _date_of(T0)
-        seed_ledger(t, [
-            f"{stamp}|not valid json {{{{",
-            row(T0, "deny_write", "good_row"),
-        ])
+        base = {"v": 1, "ts": T0, "category": "deny_write", "subject": "x",
+                "actor_bucket": "unknown"}
+        garbage = ["not valid json {{", "[1, 2]", '"just a string"',
+                   json.dumps({k: v for k, v in base.items() if k != "ts"}),
+                   json.dumps(dict(base, ts="not-a-number")),
+                   json.dumps({k: v for k, v in base.items() if k != "subject"}),
+                   json.dumps({k: v for k, v in base.items() if k != "category"}),
+                   json.dumps(dict(base, category=42))]
+        seed_ledger(t, [f"{stamp}|{g}" for g in garbage]
+                    + [row(T0, "deny_write", "good_row")])
         result, skipped = ledger.iter_rows(T0 - 1, T0 + 1)
-        assert skipped == 1, skipped
-        assert len(result) == 1
-        assert result[0]["subject"] == "good_row"
-
-    with_tmp(body)
-
-
-def test_iter_rows_hostile_non_dict_json():
-    """Non-dict JSON (list, string) is skipped."""
-    from fs_coil import ledger
-
-    def body(t, delivered, errors):
-        stamp = _date_of(T0)
-        seed_ledger(t, [
-            f"{stamp}|[1, 2]",
-            f'{stamp}|"just a string"',
-            row(T0, "deny_write", "good"),
-        ])
-        result, skipped = ledger.iter_rows(T0 - 1, T0 + 1)
-        assert skipped == 2, skipped
-        assert len(result) == 1
-
-    with_tmp(body)
-
-
-def test_iter_rows_hostile_missing_ts():
-    """Dict with missing or non-numeric ts is skipped."""
-    from fs_coil import ledger
-
-    def body(t, delivered, errors):
-        stamp = _date_of(T0)
-        no_ts = {"v": 1, "category": "deny_write", "subject": "x",
-                 "actor_bucket": "unknown"}
-        str_ts = dict(no_ts, ts="not-a-number")
-        seed_ledger(t, [
-            f"{stamp}|" + json.dumps(no_ts),
-            f"{stamp}|" + json.dumps(str_ts),
-            row(T0, "deny_write", "valid"),
-        ])
-        result, skipped = ledger.iter_rows(T0 - 1, T0 + 1)
-        assert skipped == 2, skipped
-        assert len(result) == 1
-
-    with_tmp(body)
-
-
-def test_iter_rows_hostile_missing_subject_or_category():
-    """Dict missing subject or category (non-str) is skipped."""
-    from fs_coil import ledger
-
-    def body(t, delivered, errors):
-        stamp = _date_of(T0)
-        no_subj = {"v": 1, "ts": T0, "category": "deny_write",
-                   "actor_bucket": "unknown"}
-        no_cat = {"v": 1, "ts": T0, "subject": "x", "actor_bucket": "unknown"}
-        int_cat = {"v": 1, "ts": T0, "category": 42, "subject": "x",
-                   "actor_bucket": "unknown"}
-        seed_ledger(t, [
-            f"{stamp}|" + json.dumps(no_subj),
-            f"{stamp}|" + json.dumps(no_cat),
-            f"{stamp}|" + json.dumps(int_cat),
-            row(T0, "deny_write", "valid"),
-        ])
-        result, skipped = ledger.iter_rows(T0 - 1, T0 + 1)
-        assert skipped == 3, skipped
-        assert len(result) == 1
-
+        assert skipped == len(garbage), skipped
+        assert [r["subject"] for r in result] == ["good_row"]
     with_tmp(body)
 
 
 def test_iter_rows_hostile_undecodable_bytes():
     """Undecodable bytes in a line are skipped and counted."""
-    from fs_coil import ledger
 
     def body(t, delivered, errors):
         d = t / "notify"
@@ -217,7 +155,6 @@ def test_iter_rows_hostile_undecodable_bytes():
 
 def test_cmd_noise_default_hides_notified():
     """cmd_noise default hides notified==True rows."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         notified_row = row(T0, "deny_write", "notified_subj", notified=True)
@@ -234,7 +171,6 @@ def test_cmd_noise_default_hides_notified():
 
 def test_cmd_noise_all_includes_notified():
     """cmd_noise --all includes notified rows."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         seed_ledger(t, [
@@ -251,7 +187,6 @@ def test_cmd_noise_all_includes_notified():
 
 def test_cmd_noise_category_filter():
     """--category filters by category (AND logic)."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         seed_ledger(t, [
@@ -268,7 +203,6 @@ def test_cmd_noise_category_filter():
 
 def test_cmd_noise_actor_filter():
     """--actor filters by actor_bucket (AND logic)."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         seed_ledger(t, [
@@ -285,7 +219,6 @@ def test_cmd_noise_actor_filter():
 
 def test_cmd_noise_days_selects_files():
     """--days selects the right calendar files."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         old_ts = T0 - 3 * 86400   # 3 days ago
@@ -309,7 +242,6 @@ def test_cmd_noise_days_selects_files():
 
 def test_cmd_noise_empty_prints_hint():
     """Empty result prints the config hint."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         # No ledger rows at all
@@ -321,7 +253,6 @@ def test_cmd_noise_empty_prints_hint():
 
 def test_cmd_noise_groups_by_category_and_actor():
     """Rows are grouped by category then actor_bucket."""
-    from fs_coil.ledger import cmd_noise
 
     def body(t, delivered, errors):
         seed_ledger(t, [
@@ -341,17 +272,9 @@ def test_cmd_noise_groups_by_category_and_actor():
 
 # ================================================================ cmd_prune
 
-def _prune_helper():
-    """Return the _prune_dated helper from commands."""
-    import fs_coil.commands as cmd_mod
-    return cmd_mod._prune_dated
-
-
 def test_prune_dated_notify_deletes_old_leaves_young():
     """_prune_dated removes only old matching files, leaves young, non-matching,
     subdirectories, and symlinks to outside targets intact."""
-    import fs_coil.commands as cmd_mod
-    from fs_coil import ledger
 
     def body(t, delivered, errors):
         notify_dir = t / "notify"
@@ -386,7 +309,7 @@ def test_prune_dated_notify_deletes_old_leaves_young():
         sym = notify_dir / f"digest-{sym_date}.txt"
         sym.symlink_to(outside)
 
-        name_re = r"^(events|digest)-\d{4}-\d{2}-\d{2}\.(ndjson|txt)$"
+        name_re = r"^(?:events|digest)-(\d{4}-\d{2}-\d{2})\.(?:ndjson|txt)$"
         n = cmd_mod._prune_dated(str(notify_dir), name_re, 45, "notify")
 
         assert n == 1, f"expected 1 pruned, got {n}"
@@ -403,7 +326,6 @@ def test_prune_dated_notify_deletes_old_leaves_young():
 
 def test_cmd_prune_target_notify():
     """cmd_prune(target='notify') uses ledger_dir and correct defaults."""
-    import fs_coil.commands as cmd_mod
 
     def body(t, delivered, errors):
         notify_dir = t / "notify"
@@ -426,7 +348,6 @@ def test_cmd_prune_target_notify():
 
 def test_cmd_prune_unknown_target_exits_1():
     """Unknown target exits with code 1."""
-    import fs_coil.commands as cmd_mod
 
     def body(t, delivered, errors):
         try:
@@ -441,7 +362,6 @@ def test_cmd_prune_unknown_target_exits_1():
 def test_cmd_prune_logs_target():
     """cmd_prune(target='logs') deletes old log files via _prune_dated."""
     import tempfile
-    import fs_coil.commands as cmd_mod
 
     with tempfile.TemporaryDirectory() as td:
         tmp_path = Path(td)
@@ -472,58 +392,31 @@ def test_cmd_prune_logs_target():
 
 # ================================================================ cmd_status
 
-def test_cmd_status_degraded_reason():
-    """cmd_status shows degraded reason when notify.set_degraded has been called."""
-    import fs_coil.commands as cmd_mod
-
+def test_cmd_status_shows_degraded_flag():
+    """'none' without the flag; the reason once notify.set_degraded ran.
+    launchctl is stubbed out."""
     def body(t, delivered, errors):
-        nf.set_degraded("test-reason")
-
-        # Monkeypatch subprocess.run to avoid launchctl call
         orig_run = cmd_mod.subprocess.run
         cmd_mod.subprocess.run = lambda *a, **kw: type(
             "R", (), {"returncode": 1, "stdout": "", "stderr": ""})()
         try:
             out = _capture(cmd_mod.cmd_status)
+            assert "degraded" in out and "none" in out, out
+            nf.set_degraded("test-reason")
+            assert "test-reason" in _capture(cmd_mod.cmd_status)
         finally:
             cmd_mod.subprocess.run = orig_run
-
-        assert "degraded" in out
-        assert "test-reason" in out
-
-    with_tmp(body)
-
-
-def test_cmd_status_no_degraded_shows_none():
-    """cmd_status shows 'none' when not degraded."""
-    import fs_coil.commands as cmd_mod
-
-    def body(t, delivered, errors):
-        # No set_degraded call — fresh state file won't exist
-        orig_run = cmd_mod.subprocess.run
-        cmd_mod.subprocess.run = lambda *a, **kw: type(
-            "R", (), {"returncode": 1, "stdout": "", "stderr": ""})()
-        try:
-            out = _capture(cmd_mod.cmd_status)
-        finally:
-            cmd_mod.subprocess.run = orig_run
-
-        assert "degraded" in out
-        assert "none" in out
-
     with_tmp(body)
 
 
 def test_cmd_noise_strips_control_chars():
     def body(t, delivered, errors):
-        from fs_coil import ledger
         seed_ledger(t, [row(T0, "scan_finding", "evil\x1b[2Jrule: ~/z")])
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             ledger.cmd_noise(now=T0 + 1)
         assert "\x1b" not in buf.getvalue() and "evil [2Jrule" in buf.getvalue()
     with_tmp(body)
-
 
 
 if __name__ == "__main__":

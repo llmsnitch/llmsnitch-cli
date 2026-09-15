@@ -136,31 +136,18 @@ def cmd_logs(follow=False):
 
 def _prune_dated(dir_path, name_re, days, label):
     """Delete regular non-symlink files in dir_path whose name matches name_re
-    and whose embedded YYYY-MM-DD stamp is older than `days` days.
-    No recursion, no symlink following. Returns count of removed files.
-    # ponytail: ceiling is one dir level only — subdirs and symlinks always skip
-    """
+    (group 1 = YYYY-MM-DD) and whose stamp is older than `days` days. No
+    recursion, no symlink following. Returns the count removed."""
     import re as _re
     dir_p = Path(dir_path)
     if not dir_p.is_dir():
         warn(f"no {label} dir at {dir_p}")
         return 0
     cutoff = datetime.now().date() - timedelta(days=days)
-    pat = _re.compile(name_re)
     removed = 0
-    try:
-        entries = sorted(dir_p.iterdir())
-    except OSError:
-        return 0
-    for f in entries:
-        if not pat.match(f.name):
-            continue
-        if os.path.islink(str(f)):   # never follow or remove symlinks
-            continue
-        if not f.is_file():          # skip subdirs
-            continue
-        m = _re.search(r"(\d{4}-\d{2}-\d{2})", f.name)
-        if not m:
+    for f in sorted(dir_p.iterdir()):
+        m = _re.match(name_re, f.name)
+        if not m or os.path.islink(str(f)) or not f.is_file():
             continue
         try:
             fdate = datetime.strptime(m.group(1), "%Y-%m-%d").date()
@@ -176,38 +163,25 @@ def _prune_dated(dir_path, name_re, days, label):
 
 
 def cmd_prune(days=None, target=None):
-    """Delete dated files older than `days` for the given target.
-
-    target None or 'logs'   → fs-coil log dir,   default 30 days
-    target 'notify'         → ledger/digest dir,  default 45 days
-    """
-    if target is None or target == "logs":
-        _days = days if days is not None else 30
-        if _days < 1:
-            err("prune: --days must be >= 1")
-            sys.exit(1)
+    """Delete dated files older than `days`. target None|'logs' → fs-coil
+    log dir (default 30 days); 'notify' → ledger + digests (default 45)."""
+    if target in (None, "logs"):
         user = console_user() or pwd.getpwuid(os.getuid()).pw_name
-        home = user_home(user)
-        log_dir = Path(home) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
-        n = _prune_dated(str(log_dir),
-                         r"^fs-coil-\d{4}-\d{2}-\d{2}\.log$",
-                         _days, "logs")
-        ok(f"pruned {n} logs file(s) older than {_days} day(s)")
+        d = Path(user_home(user)) / "Library" / "Logs" / "llmsnitch" / "fs-coil"
+        spec = (str(d), r"^fs-coil-(\d{4}-\d{2}-\d{2})\.log$", 30, "logs")
     elif target == "notify":
-        _days = days if days is not None else 45
-        if _days < 1:
-            err("prune: --days must be >= 1")
-            sys.exit(1)
         from fs_coil import ledger
-        notify_dir = ledger.ledger_dir()
-        n = _prune_dated(notify_dir,
-                         r"^(events|digest)-\d{4}-\d{2}-\d{2}\.(ndjson|txt)$",
-                         _days, "notify")
-        ok(f"pruned {n} notify file(s) older than {_days} day(s)")
+        spec = (ledger.ledger_dir(),
+                r"^(?:events|digest)-(\d{4}-\d{2}-\d{2})\.(?:ndjson|txt)$", 45, "notify")
     else:
         err(f"unknown prune target: {target!r} (use 'logs' or 'notify')")
         sys.exit(1)
-
+    days = spec[2] if days is None else days
+    if days < 1:
+        err("prune: --days must be >= 1")
+        sys.exit(1)
+    n = _prune_dated(spec[0], spec[1], days, spec[3])
+    ok(f"pruned {n} {spec[3]} file(s) older than {days} day(s)")
 
 
 def cmd_test():

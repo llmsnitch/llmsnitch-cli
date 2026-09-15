@@ -90,20 +90,13 @@ def iter_rows(start_ts, end_ts, *, dir_path=None):
             except json.JSONDecodeError:
                 skipped += 1
                 continue
-            if not isinstance(obj, dict):
+            if not (isinstance(obj, dict)
+                    and isinstance(obj.get("ts"), (int, float))
+                    and isinstance(obj.get("category"), str)
+                    and isinstance(obj.get("subject"), str)):
                 skipped += 1
                 continue
-            ts = obj.get("ts")
-            if not isinstance(ts, (int, float)):
-                skipped += 1
-                continue
-            if not isinstance(obj.get("category"), str):
-                skipped += 1
-                continue
-            if not isinstance(obj.get("subject"), str):
-                skipped += 1
-                continue
-            if start_ts <= ts < end_ts:
+            if start_ts <= obj["ts"] < end_ts:
                 out.append(obj)
 
     out.sort(key=lambda r: r["ts"])
