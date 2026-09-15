@@ -1,7 +1,7 @@
 # Digest Outlet — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN (charted 2026-09-14)`
+`status: DONE (charted and closed 2026-09-14)`
 
 ## Destination
 
@@ -73,6 +73,12 @@ the degraded flag. The map closes when
   --target notify`, `status` degraded line, `digest --install-agent`; spec
   amended first; suite 135 → 174; three review gates applied. Not
   installed — T602 activates.
+- [T602 — Activate the digest outlet](tickets/T602-activate-digest.md) —
+  main fast-forwarded, pipx reinstalled, `com.slav-it.llmsnitch-digest`
+  bootstrapped (10:00 daily, `fs-coil digest --prune`), kickstart wrote
+  the first real digest with the 09:30 patrol in ① and no banner; seeded
+  unhealthy → one `watcher_health` banner; `suppress_*` stopgap key
+  deleted from the live config. Destination reached; map closed.
 
 ## Not yet specified
 
