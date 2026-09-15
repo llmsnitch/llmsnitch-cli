@@ -386,6 +386,23 @@ def test_hash_mismatch_is_operational():
     _with_tmp(body)
 
 
+def test_stamp_state_writes_critical_count():
+    """Plan 012 step 3: _stamp_state writes findings_critical (unwaived
+    criticals) alongside the total findings count — the digest reads both."""
+    def body(t, delivered, errors):
+        proj = t / "proj"
+        _seed_env(proj, [("evilpkg", "1.0"), ("kevpkg", "2.0")])
+        _seed_session(t, "s1", str(proj), ["pip install -r reqs.txt"])
+        # evilpkg → malicious+intake → unwaived critical
+        # kevpkg  → kev but unexercised → lesser (record_only)
+        _write_bulletin(t, [_mal("evilpkg"), _vuln("kevpkg", ["2.0"], kev=True)])
+        rc, _ = _audit(t)
+        assert rc == 1
+        st = json.loads((t / "store" / "depaudit-state.json").read_text())
+        assert st["findings"] == 2 and st["findings_critical"] == 1, st
+    _with_tmp(body)
+
+
 def test_bulletin_age_stamped():
     def body(t, delivered, errors):
         proj = t / "proj"

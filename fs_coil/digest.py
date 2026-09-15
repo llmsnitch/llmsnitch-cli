@@ -53,10 +53,12 @@ def health_report(now=None):
     """Watcher health from producer state files + the degraded flag. Never raises."""
     now = now if now is not None else time.time()
     patrol = None
+    patrol_meta = None
     for p in glob.glob(os.path.join(_base_dir(), "scans", "*", "meta.json")):
         m = _json(p)
         if m.get("trigger") == "patrol" and _num(m.get("ended_at")) is not None:
-            patrol = max(patrol or 0, m["ended_at"])
+            if patrol is None or m["ended_at"] > patrol:
+                patrol, patrol_meta = m["ended_at"], m
     dep = _json(os.path.join(_base_dir(), "depaudit-state.json"))
     dep_ts, age = _num(dep.get("ts")), _num(dep.get("bulletin_age_days"))
     degraded = notify.get_degraded()
@@ -72,8 +74,12 @@ def health_report(now=None):
         problems.append(f"bulletin stale ({'unknown' if age is None else f'{age:.0f}d'})")
     if degraded:
         problems.append(f"notifier degraded: {clean(degraded)}")
+    sev = (patrol_meta or {}).get("findings_by_severity")
     return {"now": now, "patrol_ts": patrol, "depaudit_ts": dep_ts,
-            "bulletin_age_days": age, "degraded": degraded, "problems": problems}
+            "bulletin_age_days": age, "degraded": degraded, "problems": problems,
+            "scan_findings": sev if isinstance(sev, dict) else {},
+            "dep_findings": _num(dep.get("findings")) or 0,
+            "dep_critical": _num(dep.get("findings_critical")) or 0}
 
 
 # ---------------------------------------------------------------- render
@@ -126,6 +132,19 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
          f"  degraded    {health['degraded'] or 'none'}"]
     L += [f"  → action: {p} — {_FIX[p.split(' ')[0]]}" for p in probs] or \
          ["  → all watchers healthy"]
+
+    sev = health.get("scan_findings", {})
+    sc, sh, sl = sev.get("critical", 0), sev.get("high", 0), sev.get("low", 0)
+    dc, dtot = health.get("dep_critical", 0), health.get("dep_findings", 0)
+    if sc or sh or sl or dtot:
+        parts = []
+        if sc or sh or sl:
+            parts.append(f"scan {sc}c/{sh}h/{sl}l (llmsnitch scan --report)")
+        if dtot:
+            parts.append(f"dep-audit {dc}c/{dtot} (llmsnitch depaudit)")
+        L += ["", "open findings (last patrol): " + " · ".join(parts)]
+    else:
+        L += ["", "open findings: none"]
 
     L += ["", f"② new since last digest ({len(new)})"]
     items = sorted((_tier(first[k]), k) for k in new)

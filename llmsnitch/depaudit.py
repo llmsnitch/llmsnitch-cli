@@ -280,7 +280,10 @@ def _stamp_state(meta, findings, note):
             fh.write(json.dumps({
                 "ts": store.now(), "bulletin_age_days": meta.get("bulletin_age_days"),
                 "intakes": meta.get("intakes"), "envs": meta.get("envs"),
-                "findings": len(findings), "note": note}))
+                "findings": len(findings),
+                "findings_critical": sum(1 for f in findings
+                                         if f.get("critical") and not f.get("waived")),
+                "note": note}))
         store._chmod_private(p)
     except OSError:
         pass

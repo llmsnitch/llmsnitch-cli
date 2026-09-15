@@ -276,5 +276,87 @@ def test_depaudit_stamps_state_even_when_bulletin_missing():
     _tmp(body)
 
 
+# ---------------------------------------------------------------- open findings (plan 012)
+
+def test_open_findings_readout_from_scan_meta():
+    def body(t, d, e):
+        _healthy(t)
+        scan = t / "store" / "scans" / "scan-x"
+        (scan / "meta.json").write_text(json.dumps(
+            {"trigger": "patrol", "ended_at": T0 - H,
+             "findings_by_severity": {"critical": 1, "high": 2, "low": 3}}))
+        text = _render([], **{k: v for k, v in digest.health_report(T0).items()
+                              if k != "now"})
+        assert "open findings (last patrol): scan 1c/2h/3l (llmsnitch scan --report)" in text, text
+    _tmp(body)
+
+
+def test_open_findings_readout_dep_audit():
+    def body(t, d, e):
+        _healthy(t)
+        (t / "store" / "depaudit-state.json").write_text(json.dumps(
+            {"ts": T0 - H, "bulletin_age_days": 2.0,
+             "findings": 4, "findings_critical": 1}))
+        text = _render([], **{k: v for k, v in digest.health_report(T0).items()
+                              if k != "now"})
+        assert "open findings (last patrol): dep-audit 1c/4 (llmsnitch depaudit)" in text, text
+    _tmp(body)
+
+
+def test_open_findings_none_when_clean():
+    def body(t, d, e):
+        _healthy(t)
+        # patrol meta with empty findings_by_severity (default), dep findings:0
+        (t / "store" / "depaudit-state.json").write_text(json.dumps(
+            {"ts": T0 - H, "bulletin_age_days": 2.0,
+             "findings": 0, "findings_critical": 0}))
+        text = _render([], **{k: v for k, v in digest.health_report(T0).items()
+                              if k != "now"})
+        assert "\nopen findings: none\n" in text, text
+    _tmp(body)
+
+
+def test_open_findings_survives_novelty_window():
+    """Core regression: a persistent scan finding aged out of ② still shows
+    in the standing readout, because the readout reads producer state, not
+    the 7-day novelty window."""
+    def body(t, d, e):
+        _healthy(t)
+        scan = t / "store" / "scans" / "scan-x"
+        (scan / "meta.json").write_text(json.dumps(
+            {"trigger": "patrol", "ended_at": T0 - H,
+             "findings_by_severity": {"critical": 1}}))
+        # same row in window and lookback → "known", never listed in ②
+        known = row(T0 - H, "scan_finding", "critical wildcard: ~/x")
+        text = _render([known], lookback=[known], prior=[],
+                       **{k: v for k, v in digest.health_report(T0).items()
+                          if k != "now"})
+        sec2 = text.split("② new")[1].split("③ counts")[0]
+        assert "nothing new" in sec2, sec2
+        assert "open findings (last patrol): scan 1c/0h/0l" in text, text
+    _tmp(body)
+
+
+def test_depaudit_finding_renders_in_section_two():
+    """New unwaived critical depaudit_finding renders under ② with the
+    right decision line and tier — the never-run render path."""
+    def body(t, d, e):
+        r = row(T0 - H, "depaudit_finding", "critical malicious: evilpkg 1.0", "codex")
+        text = _render([r], lookback=[], prior=[])
+        sec2 = text.split("② new")[1].split("③ counts")[0]
+        assert "[CRITICAL] depaudit_finding" in sec2, sec2
+        assert "→ action: uninstall if unexpected; detail: llmsnitch depaudit" in sec2, sec2
+        assert "codex · critical malicious: evilpkg 1.0" in sec2, sec2
+    _tmp(body)
+
+
+def test_health_report_missing_meta_is_zero():
+    def body(t, d, e):
+        h = digest.health_report(T0)         # no store at all
+        assert h["scan_findings"] == {} and h["dep_findings"] == 0
+        assert h["dep_critical"] == 0
+    _tmp(body)
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

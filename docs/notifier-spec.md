@@ -658,6 +658,14 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
     missed if older than 26h or absent, stale if bulletin age > 14 days
     or unknown), degraded flag (`notify.get_degraded()`), and the count of
     ledger lines the reader skipped as garbage.
+  **open findings** — a one-line standing readout follows ① health:
+    `open findings (last patrol): scan Nc/Nh/Nl (llmsnitch scan --report)
+    · dep-audit Nc/N (llmsnitch depaudit)`, sourced from the newest patrol
+    `meta.json`'s `findings_by_severity` and `depaudit-state.json`
+    (`findings`, `findings_critical`). Pull-only — never banners, never
+    calls `notify()`. Persists regardless of the 7-day novelty window
+    below, so a finding that has aged out of ② is still visible until
+    resolved. Zero findings → `open findings: none`.
   ② **new since last digest** — subjects `(category, actor_bucket,
     subject)` in the window that did not appear in the ledger during the
     7 days before it; ordered critical → high → lesser (low severity /
