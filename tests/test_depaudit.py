@@ -241,6 +241,27 @@ def test_waiver_silences_critical():
     _with_tmp(body)
 
 
+def test_waive_preserves_foreign_rows():
+    """--waive appends to the shared waivers.json without dropping rows of
+    another surface's shape (D05: config-audit rows live in the same file)."""
+    def body(t, delivered, errors):
+        proj = t / "proj"
+        _seed_env(proj, [("evilpkg", "1.0")])
+        _write_bulletin(t, [_mal("evilpkg")])
+        foreign = {"surface": "config-audit", "rule_id": "hook_unquoted_var",
+                   "artifact": "~/.claude/settings.json", "reason": "r",
+                   "evidence": ["x"], "waived_at": 1.0}
+        depaudit._waivers_path().parent.mkdir(parents=True, exist_ok=True)
+        depaudit._waivers_path().write_text(json.dumps([foreign]))
+        assert depaudit.cmd_depaudit(
+            ["--waive", "MAL-2026-0001", "evilpkg", "--reason", "fixture"],
+            io.StringIO()) == 0
+        rows = json.loads(depaudit._waivers_path().read_text())
+        assert foreign in rows and len(rows) == 2, rows
+        assert len(depaudit.load_waivers()) == 1
+    _with_tmp(body)
+
+
 def test_waiver_matches_alias():
     """Waiver written against any alias survives canonical-id churn."""
     def body(t, delivered, errors):
