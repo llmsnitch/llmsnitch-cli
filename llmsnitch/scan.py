@@ -384,13 +384,13 @@ def _save_baseline(baseline):
     store._chmod_private(p)
 
 
-def _drift_salt(cls, art, sha):
+def _drift_salt(art, sha):
     """What the baseline tracks for an artifact: its content sha, except
     ~/.claude.json — Claude Code rewrites it every session (numStartups,
     tips, project history), so drift there is semantic: the sha of the
     canonical JSON of mcpServers + projects[*].mcpServers (quiet-patrol
     D09). Unparseable JSON falls back to the whole-file sha."""
-    if cls != "mcp_config" or Path(art).name != ".claude.json":
+    if Path(art).name != ".claude.json":
         return sha
     try:
         doc = json.loads(Path(os.path.expanduser(art)).read_text())
@@ -416,7 +416,7 @@ def _drift(scan_id, baseline, current, rebaseline):
             continue
         prev = baseline.get(key)
         art = key.split("\x1f", 1)[1]
-        salt = _drift_salt(cls, art, sha)
+        salt = _drift_salt(art, sha)
         if prev is None:
             baseline[key] = {"sha256": salt, "first_seen_ts": now}
             if not seeded and not rebaseline:
