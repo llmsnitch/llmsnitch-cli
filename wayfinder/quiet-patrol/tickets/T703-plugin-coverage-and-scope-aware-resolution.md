@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T704`
-`status: OPEN — unclaimed`
+`status: CLAIMED (quiet-patrol/T703, 2026-09-18)`
 
 ## Question
 
