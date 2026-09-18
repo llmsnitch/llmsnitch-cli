@@ -513,7 +513,6 @@ def add_scan_waiver(rule_id, artifact, reason, out):
     waivers.append({"surface": "config-audit", "rule_id": rule_id,
                     "artifact": artifact, "reason": reason, "evidence": ev,
                     "waived_at": store.now()})
-    store._mkdir_private(store.base_dir())
     p = _waivers_path()
     with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
         fh.write(json.dumps(waivers, indent=2))
@@ -602,8 +601,9 @@ def _route_to_notifier(findings):
     info/low findings carry no decision and are record_only (AGENTS.md
     doctrine) — except drift, which always names one (rebaseline or revert).
     Resolved tombstone rows are bookkeeping, not findings — no rule_id, not
-    routed. Waived rows are ledgered record_only (D06). Returns False when the notify layer is unavailable, and the
-    caller records that in meta so silence stays discoverable."""
+    routed. Waived rows are ledgered record_only (D06). Returns False when
+    the notify layer is unavailable, and the caller records that in meta so
+    silence stays discoverable."""
     try:
         from fs_coil import notify as fs_notify
     except Exception:   # noqa: BLE001 — no vendored tree, or a broken one;
