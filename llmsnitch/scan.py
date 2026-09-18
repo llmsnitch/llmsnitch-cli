@@ -135,13 +135,10 @@ def discover(roots=None):
                 if (t / sub).is_dir():
                     for p in _walk(t / sub, budget):
                         add(p)
-        # Plugins (D10): depth is measured from each plugin root, not from
-        # the territory (plugin skills sit at depth 8 from ~/.claude). A
-        # second pass over every territory, so one agent's plugin cache can
-        # not starve another agent's own skills of budget. Marketplaces
-        # first: one clone each, artifact-dense; cache holds a copy per
-        # installed version. A root inside a junk dir
-        # (cache/temp_git_*/.git/hooks) is skipped like _walk would skip it.
+        # Plugins (D10): depth measured from each plugin root (skills sit at
+        # depth 8 from ~/.claude). Second pass so one agent's plugin cache
+        # can't starve another's skills; marketplaces first (one clone each,
+        # artifact-dense); roots inside junk dirs (temp_git_*/.git) skipped.
         for t in terrs:
             for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
                 for root in sorted(t.glob(pat)):
@@ -516,7 +513,7 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
         # still counts) or gone from disk (the _drift removal test). An
         # out-of-scope artifact is neither re-emitted nor tombstoned.
         in_scope = {_display(p) for p, _, _ in targets}
-        for fp in sorted(fp for fp in prev_fps if fp not in cur_fps):
+        for fp in sorted(prev_fps.keys() - cur_fps):
             art = prev_fps[fp]
             if art in in_scope or not (
                     art and Path(os.path.expanduser(art)).exists()):
