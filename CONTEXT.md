@@ -172,10 +172,20 @@ to re-page a finding.
 _Avoid_: report (taken by `scan --report`), summary email, daily alert
 
 **Waiver**:
-A user-granted exception silencing a specific dep-audit finding
-(advisory × package), carrying a reason, living until removed or the
-advisory's severity escalates.
-_Avoid_: exception, allowlist entry, suppression
+A user-granted exception silencing a specific finding on any surface,
+carrying a reason, living until removed or the finding's underlying
+condition changes in a way the surface defines as re-raising (dep-audit:
+the advisory's severity escalates; config-audit: the set of matched
+evidence for the rule × artifact changes).
+_Avoid_: exception, allowlist entry, suppression, accept record
+
+**Hook state**:
+A non-executable file without a script extension living under a harness's
+hooks directory — data a hook writes at runtime (a signal file, a
+per-session marker, a config it reads back). Not a control surface: scanned
+for secrets at rest, never fingerprinted for drift. Contrast **hook script**,
+which runs.
+_Avoid_: hook file, state file, session file
 
 **Unattested agent**:
 A directory matching agent-home heuristics (`scanrules.DISCOVERY_*`) that
