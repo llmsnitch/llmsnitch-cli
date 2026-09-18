@@ -124,8 +124,9 @@ def discover(roots=None):
                 add(p)
     else:
         home = Path(_HOME)
-        for prefixes in scanrules.TERRITORIES.values():
-            t = Path(os.path.expanduser(prefixes[0]))
+        terrs = [Path(os.path.expanduser(p[0]))
+                 for p in scanrules.TERRITORIES.values()]
+        for t in terrs:
             for single in (t / "settings.json", t / "settings.local.json",
                            t / "managed-settings.json", t / "mcp.json",
                            t / "CLAUDE.md"):
@@ -134,11 +135,18 @@ def discover(roots=None):
                 if (t / sub).is_dir():
                     for p in _walk(t / sub, budget):
                         add(p)
-            # Plugins: depth is measured from each plugin root, not from the
-            # territory (plugin skills sit at depth 8 from ~/.claude; D10).
-            for pat in ("plugins/cache/*/*/*", "plugins/marketplaces/*"):
+        # Plugins (D10): depth is measured from each plugin root, not from
+        # the territory (plugin skills sit at depth 8 from ~/.claude). A
+        # second pass over every territory, so one agent's plugin cache can
+        # not starve another agent's own skills of budget. Marketplaces
+        # first: one clone each, artifact-dense; cache holds a copy per
+        # installed version. A root inside a junk dir
+        # (cache/temp_git_*/.git/hooks) is skipped like _walk would skip it.
+        for t in terrs:
+            for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
                 for root in sorted(t.glob(pat)):
-                    if root.is_dir() and not root.is_symlink():
+                    if (root.is_dir() and not root.is_symlink()
+                            and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
                         for p in _walk(root, budget):
                             add(p)
         add(home / ".claude.json")
