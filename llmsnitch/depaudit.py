@@ -206,26 +206,11 @@ def _exercised(cwd, intake_ts, dist, package):
 
 # -- waivers ------------------------------------------------------------------
 
-def _waivers_path():
-    return store.base_dir() / "waivers.json"
-
-
-def _waivers_raw():
-    """Every row in the shared file — config-audit rows included (D05,
-    wayfinder/quiet-patrol). Writers append to this, never to the filtered
-    view, or they silently drop the other surface's waivers."""
-    try:
-        raw = json.loads(_waivers_path().read_text())
-    except (OSError, json.JSONDecodeError):
-        return []
-    return raw if isinstance(raw, list) else []
-
-
 def load_waivers():
     """Well-formed dep-audit waivers only: str id, package, non-empty reason.
     The file is user-editable; malformed rows are ignored, never trusted to
     silence."""
-    return [w for w in _waivers_raw()
+    return [w for w in store.waivers_raw()
             if isinstance(w, dict)
             and isinstance(w.get("id"), str)
             and isinstance(w.get("package"), str)
@@ -266,11 +251,12 @@ def add_waiver(adv_id, package, reason, out):
                 w["severity_label"] = (entry.get("severity") or {}).get("label")
                 w["kev_listed"] = bool((entry.get("kev") or {}).get("listed"))
                 break
-    waivers = _waivers_raw()
+    waivers = store.waivers_raw()
     waivers.append(w)
     store._mkdir_private(store.base_dir())
-    p = _waivers_path()
-    p.write_text(json.dumps(waivers, indent=2))
+    p = store.waivers_path()
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+        fh.write(json.dumps(waivers, indent=2))
     store._chmod_private(p)
     out.write(f"waived {adv_id} x {package}\n")
     return 0

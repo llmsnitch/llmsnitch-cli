@@ -14,7 +14,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from fs_coil import digest                       # noqa: E402
-from llmsnitch import depaudit, scan             # noqa: E402
+from llmsnitch import depaudit, scan, store      # noqa: E402
 from tests._seams import rows as _rows, run, with_tmp  # noqa: E402
 
 _RID = "skill_instruction_override"
@@ -127,7 +127,7 @@ def test_waive_misuse_is_operational():
             out = io.StringIO()
             assert scan.cmd_scan(argv, out) == 2, argv
             assert out.getvalue().startswith("[ERROR]"), (argv, out.getvalue())
-        assert not scan._waivers_path().exists()
+        assert not store.waivers_path().exists()
     _with_tmp(body)
 
 
@@ -146,12 +146,12 @@ def test_mixed_waivers_file_round_trips_both_surfaces():
                 "reason": "r"},                                    # no evidence
                "garbage"]
         (t / "store").mkdir(exist_ok=True)
-        scan._waivers_path().write_text(json.dumps([dep] + bad))
+        store.waivers_path().write_text(json.dumps([dep] + bad))
         assert scan.load_scan_waivers() == []
         assert depaudit.load_waivers() == [dep]
         assert scan.cmd_scan(["--waive", _RID, art, "--reason", "ok"],
                              io.StringIO()) == 0
-        raw = json.loads(scan._waivers_path().read_text())
+        raw = json.loads(store.waivers_path().read_text())
         assert dep in raw and "garbage" in raw
         mine = scan.load_scan_waivers()
         assert len(mine) == 1 and mine[0]["evidence"] == [
@@ -161,7 +161,7 @@ def test_mixed_waivers_file_round_trips_both_surfaces():
         assert scan.cmd_scan(["--waive", _RID, art, "--reason", "again"],
                              io.StringIO()) == 0
         assert [w["reason"] for w in scan.load_scan_waivers()] == ["again"]
-        assert oct(scan._waivers_path().stat().st_mode & 0o777) == "0o600"
+        assert oct(store.waivers_path().stat().st_mode & 0o777) == "0o600"
     _with_tmp(body)
 
 

@@ -20,7 +20,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from llmsnitch import depaudit  # noqa: E402
+from llmsnitch import depaudit, store  # noqa: E402
 from tests._seams import rows as _rows, run, with_tmp  # noqa: E402
 
 
@@ -251,12 +251,12 @@ def test_waive_preserves_foreign_rows():
         foreign = {"surface": "config-audit", "rule_id": "hook_unquoted_var",
                    "artifact": "~/.claude/settings.json", "reason": "r",
                    "evidence": ["x"], "waived_at": 1.0}
-        depaudit._waivers_path().parent.mkdir(parents=True, exist_ok=True)
-        depaudit._waivers_path().write_text(json.dumps([foreign]))
+        store.waivers_path().parent.mkdir(parents=True, exist_ok=True)
+        store.waivers_path().write_text(json.dumps([foreign]))
         assert depaudit.cmd_depaudit(
             ["--waive", "MAL-2026-0001", "evilpkg", "--reason", "fixture"],
             io.StringIO()) == 0
-        rows = json.loads(depaudit._waivers_path().read_text())
+        rows = json.loads(store.waivers_path().read_text())
         assert foreign in rows and len(rows) == 2, rows
         assert len(depaudit.load_waivers()) == 1
     _with_tmp(body)

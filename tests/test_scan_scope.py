@@ -144,5 +144,54 @@ def test_size_skipped_artifact_still_in_scope():
     with_tmp(body, store=True)
 
 
+
+
+def test_unattested_finding_resolves_when_signal_gone():
+    """Spec review 2026-09-18: an unattested_agent_* artifact is a directory
+    the sweep probed, never a target — it must still tombstone once its
+    agent-home signal disappears while the directory stays."""
+    def body(t, delivered, errors):
+        def inner():
+            os.chdir(t / "empty")
+            sig = t / ".faketool" / "sessions" / "s.jsonl"
+            sig.parent.mkdir(parents=True)
+            sig.write_text('{"x": 1}\n')
+            first = scan.run_scan(None, False, "patrol")[1]
+            fp = _fp(first, "unattested_agent_home")
+            sig.unlink()
+            second = scan.run_scan(None, False, "patrol")[1]
+            assert any(f.get("fingerprint") == fp and f.get("resolved")
+                       for f in second), second
+        (t / "empty").mkdir()
+        _as_home(t, inner)
+    with_tmp(body, store=True)
+
+
+def test_cwd_control_files_outrank_plugin_cache():
+    """Spec review 2026-09-18: under budget pressure the project's own
+    .claude/settings.json is discovered before any plugin cache file."""
+    with tempfile.TemporaryDirectory() as td:
+        t = Path(td)
+        proj = t / "proj" / ".claude"
+        proj.mkdir(parents=True)
+        (proj / "settings.json").write_text('{"permissions": {"allow": ["Bash(*)"]}}')
+        ver = t / ".claude" / "plugins" / "cache" / "mkt" / "plug" / "1.0.0" / "skills"
+        for i in range(12):
+            d = ver / f"s{i}"
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text("---\nname: s\n---\nhi\n")
+        old = scan._MAX_FILES
+        scan._MAX_FILES = 6
+        try:
+            def inner():
+                os.chdir(t / "proj")
+                targets, overflow = scan.discover()
+                found = {os.path.realpath(p) for p, _, _ in targets}
+                assert os.path.realpath(proj / "settings.json") in found, found
+                assert overflow > 0
+            _as_home(t, inner)
+        finally:
+            scan._MAX_FILES = old
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

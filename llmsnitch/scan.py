@@ -146,17 +146,6 @@ def discover(roots=None):
                 if (t / sub).is_dir():
                     for p in _walk(t / sub, budget):
                         add(p)
-        # Plugins (D10): depth measured from each plugin root (skills sit at
-        # depth 8 from ~/.claude). Second pass so one agent's plugin cache
-        # can't starve another's skills; marketplaces first (one clone each,
-        # artifact-dense); roots inside junk dirs (temp_git_*/.git) skipped.
-        for t in terrs:
-            for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
-                for root in sorted(t.glob(pat)):
-                    if (root.is_dir() and not root.is_symlink()
-                            and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
-                        for p in _walk(root, budget):
-                            add(p)
         add(home / ".claude.json")
         cwd = Path.cwd()
         for name in _INSTRUCTION_NAMES | {".mcp.json"}:
@@ -166,6 +155,18 @@ def discover(roots=None):
             if (cwd / sub).is_dir():
                 for p in _walk(cwd / sub, budget):
                     add(p)
+        # Plugins (D10): depth measured from each plugin root (skills sit at
+        # depth 8 from ~/.claude). Last pass so a plugin cache can starve
+        # neither another agent's skills nor the project's own .claude/
+        # control files (spec review 2026-09-18); marketplaces first (one
+        # clone each, artifact-dense); roots inside junk dirs skipped.
+        for t in terrs:
+            for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
+                for root in sorted(t.glob(pat)):
+                    if (root.is_dir() and not root.is_symlink()
+                            and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
+                        for p in _walk(root, budget):
+                            add(p)
     return list(seen.values()), max(0, -budget[0])
 
 
@@ -512,23 +513,11 @@ def _previous_fingerprints():
 
 # -- waivers -----------------------------------------------------------------
 
-def _waivers_path():
-    return store.base_dir() / "waivers.json"
-
-
-def _waivers_raw():
-    try:
-        raw = json.loads(_waivers_path().read_text())
-    except (OSError, json.JSONDecodeError):
-        return []
-    return raw if isinstance(raw, list) else []
-
-
 def load_scan_waivers():
     """Well-formed config-audit rows only (D05: the file is shared with
     dep-audit, each loader filters its own shape). Malformed rows are
     ignored, never trusted to silence."""
-    return [w for w in _waivers_raw()
+    return [w for w in store.waivers_raw()
             if isinstance(w, dict) and w.get("surface") == "config-audit"
             and isinstance(w.get("rule_id"), str)
             and isinstance(w.get("artifact"), str)
@@ -571,13 +560,13 @@ def add_scan_waiver(rule_id, artifact, reason, out):
         out.write(f"[ERROR] no finding {rule_id} x {artifact} in the latest "
                   "stored scan (artifact as `scan --report` prints it)\n")
         return 2
-    waivers = [w for w in _waivers_raw()   # dep-audit rows ride along untouched
+    waivers = [w for w in store.waivers_raw()   # dep-audit rows ride along untouched
                if not (isinstance(w, dict) and w.get("surface") == "config-audit"
                        and (w.get("rule_id"), w.get("artifact")) == (rule_id, artifact))]
     waivers.append({"surface": "config-audit", "rule_id": rule_id,
                     "artifact": artifact, "reason": reason, "evidence": ev,
                     "waived_at": store.now()})
-    p = _waivers_path()
+    p = store.waivers_path()
     with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
         fh.write(json.dumps(waivers, indent=2))
     store._chmod_private(p)
@@ -628,10 +617,15 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
         # still counts) or gone from disk (the _drift removal test). An
         # out-of-scope artifact is neither re-emitted nor tombstoned.
         in_scope = {_display(p) for p, _, _ in targets}
+        # unattested_agent_* artifacts are directories the sweep probed:
+        # in scope when their parent is one of this run's discover roots.
+        swept = {_display(Path(os.path.expanduser(r))) for r in _discover_roots()}
         for fp in sorted(prev_fps.keys() - cur_fps):
             art = prev_fps[fp]
-            if art in in_scope or not (
-                    art and Path(os.path.expanduser(art)).exists()):
+            full = os.path.expanduser(art or "")
+            if (art in in_scope
+                    or (os.path.isdir(full) and os.path.dirname(art) in swept)
+                    or not (art and os.path.exists(full))):
                 findings.append({"v": 1, "ts": store.now(),
                                  "scan_id": scan_id, "fingerprint": fp,
                                  "resolved": True})
