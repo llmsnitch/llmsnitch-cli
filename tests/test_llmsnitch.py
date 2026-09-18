@@ -609,10 +609,12 @@ def test_setup_refuses_inside_claude_and_snapshots():
         sp = Path(t) / "s.json"
         sp.write_text('{"model": "opus"}')
         out = io.StringIO()
-        assert setup_cmd.run(True, out, settings_path=str(sp), env={}) == 0
+        assert setup_cmd.run(True, out, settings_path=str(sp), env={},
+                             snap_dir=str(Path(t) / "snaps")) == 0
         cfg1 = json.loads(sp.read_text())
         assert "PreToolUse" in cfg1["hooks"] and cfg1["model"] == "opus"
-        assert setup_cmd.run(True, io.StringIO(), settings_path=str(sp), env={}) == 0
+        assert setup_cmd.run(True, io.StringIO(), settings_path=str(sp), env={},
+                             snap_dir=str(Path(t) / "snaps")) == 0
         assert json.loads(sp.read_text()) == cfg1, "second run must be a no-op"
 
 

@@ -24,7 +24,7 @@ def hooks_block(bin_path="llmsnitch"):
     }
 
 
-def run(write, out, settings_path=None, env=None):
+def run(write, out, settings_path=None, env=None, snap_dir=None):
     env = env if env is not None else os.environ
     block = hooks_block()
 
@@ -43,9 +43,10 @@ def run(write, out, settings_path=None, env=None):
     sp = Path(settings_path or "~/.claude/settings.json").expanduser()
     settings = {}
     if sp.exists():
-        snap_dir = Path("~/.config/llmsnitch").expanduser()
-        snap_dir.mkdir(parents=True, exist_ok=True)
-        snap = snap_dir / f"settings-snapshot-{time.strftime('%Y%m%d%H%M%S')}.json"
+        sd = Path(snap_dir).expanduser() if snap_dir else \
+            Path("~/.config/llmsnitch").expanduser()
+        sd.mkdir(parents=True, exist_ok=True)
+        snap = sd / f"settings-snapshot-{time.strftime('%Y%m%d%H%M%S')}.json"
         snap.write_text(sp.read_text())
         out.write(f"[OK] snapshot: {snap}\n")
         try:
