@@ -95,8 +95,9 @@ digest's open-findings line reads `0c/0h/0l · 2 waived`.
   emits one re-salt `drift_changed` on `~/.claude.json`, then quiet. +8 tests.
 - [T703 — Plugin coverage and scope-aware resolution](tickets/T703-plugin-coverage-and-scope-aware-resolution.md)
   — plugin roots (`plugins/cache/*/*/*`, `plugins/marketplaces/*`) walked
-  in a second pass after all territories' core subs (a single pass starved
-  `~/.codex`); junk-nested roots skipped. Coverage from `$HOME` 74 → 596 of
+  in a last pass after all territories' core subs **and the cwd walk** (a
+  single pass starved `~/.codex`; plugins-before-cwd starved the project's
+  own `.claude/settings.json` — spec review); junk-nested roots skipped. Coverage from `$HOME` 74 → 596 of
   672 plugin artifacts, total 204 → 723; budget overflow 2 → 17 — D10's
   "budget not exhausted" was wrong, spun out as T705. Resolution folds every
   stored scan into `{fingerprint: artifact}` and tombstones only when the
@@ -110,8 +111,28 @@ digest's open-findings line reads `0c/0h/0l · 2 waived`.
   dep-audit's `add_waiver` rewrote the file from its filtered view and
   would have dropped every scan row — fixed to append to the raw list
   (+1 test). +6 tests. Suite 182 → 201.
+- Two-axis review of the merged work (2026-09-18, Standards + Spec
+  sub-agents; report in the session, fixes on this branch): Standards — no
+  hard violations; the duplicated raw waiver reader moved to
+  `store.waivers_path()` / `store.waivers_raw()`, dep-audit's writer now
+  opens 0600 via `store._open_private`. Spec — two defects fixed with
+  regression tests: D11 never resolved `unattested_agent_*` findings (their
+  artifact is a directory, never a target) → a directory whose parent is a
+  discover root is in scope; D10's plugin pass ran before the cwd walk and
+  could starve a project's `.claude/settings.json` → cwd first. Recorded as
+  D10/D11 clarifications: two-pass ordering, junk-nested-root skip, history
+  fold in `_previous_fingerprints`, D09 salt keyed on the `.claude.json`
+  file name, `--waive` replacing an earlier waiver for the same pair. Spec
+  digest example gained `· N waived`; one-time migration noise noted on
+  T704. Suite 201 → 203.
 
 ## Not yet specified
+
+- **`~/.llmsnitch/scans/` retention** — nothing prunes stored scans, and
+  `_previous_fingerprints` now folds every one of them each run (linear
+  growth under a daily patrol; the code names the ceiling). Fog until the
+  fold's cost is observable; the answer is probably a `prune` target plus a
+  rolling open-set file, decided together.
 
 - **Triage of the newly covered plugin artifacts** — T703 brings ~612
   SKILL.md / skill scripts / hooks into scope for the first time; what

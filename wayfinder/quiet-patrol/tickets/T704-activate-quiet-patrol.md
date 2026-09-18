@@ -24,6 +24,11 @@ canonical; `pipx install --force ~/llmsnitch-cli` — never the stale
    ~/.claude/plugins/marketplaces/anthropic-agent-skills/skills/claude-api/SKILL.md`
    (key-prefix description in vendored docs). Then the two
    `skill_instruction_override ~/…/improve/SKILL.md` rows (D07).
+   Expected one-time migration noise on that first patrol, not defects:
+   one `drift_changed · mcpServers changed` on `~/.claude.json` (re-salt,
+   D09) and a `drift_removed` for any pre-D08 hook-state path that was
+   baselined as `hook_script` and deleted before the run (per-session
+   `claude-notifier-active.d/<pid>` markers; spec review 2026-09-18).
 3. Done criteria (close the map when all hold):
    - the next 09:30 patrol's `findings.ndjson` has zero rows that are
      neither `waived` nor `resolved`;
