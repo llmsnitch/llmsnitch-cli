@@ -401,8 +401,12 @@ def _drift(scan_id, baseline, current, rebaseline):
             if not Path(os.path.expanduser(art)).exists():
                 del baseline[key]
                 if not rebaseline:
+                    # Attribute removals to the same territory add/change use —
+                    # a hard-coded "unknown" here splits one agent's drift
+                    # across two ledger buckets (visible in every digest).
+                    agent = _agent_bucket(os.path.expanduser(art))
                     findings.append(_drift_finding(scan_id, art, cls,
-                                                   "unknown", "removed", ""))
+                                                   agent, "removed", ""))
     return findings
 
 

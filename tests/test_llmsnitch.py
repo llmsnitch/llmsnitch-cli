@@ -149,6 +149,37 @@ def test_scan_novelty_and_drift():
     _with_tmp_store(body)
 
 
+def test_drift_removed_keeps_agent_attribution():
+    """A file removed from a known territory buckets to that territory, not
+    'unknown' — otherwise one agent's drift splits across two digest rows."""
+    from llmsnitch import scan
+    def body(t):
+        # Seed a fake ~/.claude territory in a tmp HOME so _agent_bucket
+        # resolves the removed path back to claude-code after deletion.
+        home = t / "home"
+        (home / ".claude" / "hooks").mkdir(parents=True)
+        hook = home / ".claude" / "hooks" / "task-start"
+        hook.write_text("#!/bin/sh\necho hi\n")
+        old_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(home)
+        try:
+            assert scan.cmd_scan([str(home / ".claude")], io.StringIO()) == 0
+            hook.unlink()
+            assert scan.cmd_scan([str(home / ".claude")], io.StringIO()) in (0, 1)
+        finally:
+            if old_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = old_home
+        rows = [json.loads(x) for x in
+                (sorted((t / "scans").iterdir())[-1] / "findings.ndjson")
+                .read_text().splitlines()]
+        removed = [r for r in rows if r.get("rule_id") == "drift_removed"]
+        assert removed, "no drift_removed emitted"
+        assert removed[0]["agent"] == "claude-code", removed[0]
+    _with_tmp_store(body)
+
+
 def test_scan_exit_codes():
     """Clean tree exits 0; bad root and bad format exit 2."""
     from llmsnitch import scan
