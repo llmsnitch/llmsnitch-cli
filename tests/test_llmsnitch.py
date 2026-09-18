@@ -160,6 +160,7 @@ def test_drift_removed_keeps_agent_attribution():
         (home / ".claude" / "hooks").mkdir(parents=True)
         hook = home / ".claude" / "hooks" / "task-start"
         hook.write_text("#!/bin/sh\necho hi\n")
+        hook.chmod(0o755)   # executable: hook_script, not Hook state (D08)
         old_home = os.environ.get("HOME")
         os.environ["HOME"] = str(home)
         try:

@@ -15,7 +15,9 @@ import hashlib
 import re
 
 # Artifact classes that are control surfaces — where a compromise rule hit
-# or a drift means an agent's behavior can be rewritten.
+# or a drift means an agent's behavior can be rewritten. hook_state (data a
+# hook writes at runtime, scan.classify) is deliberately absent here and
+# from every RULES class list: secret-shape pass only, no drift (D08).
 CONTROL_CLASSES = frozenset({"claude_settings", "hook_script", "mcp_config"})
 
 # Agent territories from docs/notifier-spec.md §Agent registry (paths only —

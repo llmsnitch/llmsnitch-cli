@@ -62,7 +62,15 @@ def _agent_bucket(path):
 
 
 def classify(path):
-    """Artifact class for a path, or None if not an agent artifact."""
+    """Artifact class for a path, or None if not an agent artifact.
+
+    Classes: skill_manifest, claude_settings, mcp_config, hook_script,
+    hook_state, instruction_file, skill_script. Under a hooks dir, a file
+    that is executable or carries a script extension is a hook_script
+    (control surface); anything else is Hook state — data a hook writes at
+    runtime (signal files, per-session markers, a config it reads back).
+    Hook state is scanned for secrets only and never drift-fingerprinted
+    (quiet-patrol D08)."""
     name = path.name
     parts = path.parts
     if name == "SKILL.md":
@@ -73,7 +81,9 @@ def classify(path):
             or name == ".mcp.json" or name == "mcp.json":
         return "mcp_config"
     if "hooks" in parts and ".claude" in parts:
-        return "hook_script"
+        if path.suffix in _SCRIPT_EXTS or os.access(path, os.X_OK):
+            return "hook_script"
+        return "hook_state"
     if name in _INSTRUCTION_NAMES:
         return "instruction_file"
     if path.suffix in _SCRIPT_EXTS and (
@@ -374,50 +384,79 @@ def _save_baseline(baseline):
     store._chmod_private(p)
 
 
+def _drift_salt(cls, art, sha):
+    """What the baseline tracks for an artifact: its content sha, except
+    ~/.claude.json — Claude Code rewrites it every session (numStartups,
+    tips, project history), so drift there is semantic: the sha of the
+    canonical JSON of mcpServers + projects[*].mcpServers (quiet-patrol
+    D09). Unparseable JSON falls back to the whole-file sha."""
+    if cls != "mcp_config" or Path(art).name != ".claude.json":
+        return sha
+    try:
+        doc = json.loads(Path(os.path.expanduser(art)).read_text())
+        subset = {"mcpServers": doc.get("mcpServers"),
+                  "projects": {k: v["mcpServers"]
+                               for k, v in doc.get("projects", {}).items()
+                               if isinstance(v, dict) and "mcpServers" in v}}
+    except Exception:   # noqa: BLE001 — malformed file: fall back, never raise
+        return sha
+    return hashlib.sha256(json.dumps(
+        subset, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _drift(scan_id, baseline, current, rebaseline):
     """config_drift findings vs baseline; mutates baseline to current.
-    First scan (empty baseline) and --rebaseline seed silently."""
+    First scan (empty baseline) and --rebaseline seed silently. Baseline
+    entries hold the drift salt under "sha256" (see _drift_salt)."""
     findings = []
     seeded = not baseline
     now = store.now()
     for key, (sha, cls, agent) in current.items():
+        if cls == "hook_state":   # D08: runtime data, never fingerprinted
+            continue
         prev = baseline.get(key)
         art = key.split("\x1f", 1)[1]
+        salt = _drift_salt(cls, art, sha)
         if prev is None:
-            baseline[key] = {"sha256": sha, "first_seen_ts": now}
+            baseline[key] = {"sha256": salt, "first_seen_ts": now}
             if not seeded and not rebaseline:
                 findings.append(_drift_finding(scan_id, art, cls, agent,
-                                               "added", sha))
-        elif prev.get("sha256") != sha:
-            baseline[key] = {"sha256": sha,
+                                               "added", salt))
+        elif prev.get("sha256") != salt:
+            baseline[key] = {"sha256": salt,
                              "first_seen_ts": prev.get("first_seen_ts", now)}
             if not rebaseline:
-                findings.append(_drift_finding(scan_id, art, cls, agent,
-                                               "changed", sha))
+                findings.append(_drift_finding(
+                    scan_id, art, cls, agent, "changed", salt,
+                    "mcpServers changed" if salt != sha else None))
     for key in list(baseline):
-        if key not in current:
-            cls = key.split("\x1f", 1)[0]
-            art = key.split("\x1f", 1)[1]
-            if not Path(os.path.expanduser(art)).exists():
-                del baseline[key]
-                if not rebaseline:
-                    # Attribute removals to the same territory add/change use —
-                    # a hard-coded "unknown" here splits one agent's drift
-                    # across two ledger buckets (visible in every digest).
-                    agent = _agent_bucket(os.path.expanduser(art))
-                    findings.append(_drift_finding(scan_id, art, cls,
-                                                   agent, "removed", ""))
+        if key in current:
+            continue
+        cls, art = key.split("\x1f", 1)
+        p = Path(os.path.expanduser(art))
+        if p.exists():
+            if classify(p) == "hook_state":   # D08: a stale hook_script
+                del baseline[key]              # entry, now state — no tombstone
+            continue
+        del baseline[key]
+        if not rebaseline:
+            # Attribute removals to the same territory add/change use —
+            # a hard-coded "unknown" here splits one agent's drift
+            # across two ledger buckets (visible in every digest).
+            agent = _agent_bucket(os.path.expanduser(art))
+            findings.append(_drift_finding(scan_id, art, cls,
+                                           agent, "removed", ""))
     return findings
 
 
-def _drift_finding(scan_id, art, cls, agent, change, sha):
+def _drift_finding(scan_id, art, cls, agent, change, sha, evidence=None):
     control = cls in scanrules.CONTROL_CLASSES
     cat = "config_drift" if control else "scan_hygiene"
     sev = "high" if control else "low"
     return {"v": 1, "ts": store.now(), "scan_id": scan_id,
             "rule_id": f"drift_{change}", "category": cat, "severity": sev,
             "artifact": art, "artifact_class": cls, "agent": agent,
-            "line": 0, "evidence": change, "sha256": sha,
+            "line": 0, "evidence": evidence or change, "sha256": sha,
             "fingerprint": _fingerprint(f"drift_{change}", art, sha)}
 
 
