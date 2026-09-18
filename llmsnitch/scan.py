@@ -3,6 +3,7 @@
   llmsnitch scan [ROOT ...] [--format text|json]
                  [--fail-on critical|high|medium]
                  [--rebaseline] [--report] [--patrol]
+                 [--waive RULE_ID ARTIFACT --reason TEXT]
 
 --report renders the LATEST STORED scan — no re-scan, no baseline
 mutation — so reviewing a drift finding never destroys the evidence it
@@ -509,6 +510,81 @@ def _previous_fingerprints():
     return fps
 
 
+# -- waivers -----------------------------------------------------------------
+
+def _waivers_path():
+    return store.base_dir() / "waivers.json"
+
+
+def _waivers_raw():
+    try:
+        raw = json.loads(_waivers_path().read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    return raw if isinstance(raw, list) else []
+
+
+def load_scan_waivers():
+    """Well-formed config-audit rows only (D05: the file is shared with
+    dep-audit, each loader filters its own shape). Malformed rows are
+    ignored, never trusted to silence."""
+    return [w for w in _waivers_raw()
+            if isinstance(w, dict) and w.get("surface") == "config-audit"
+            and isinstance(w.get("rule_id"), str)
+            and isinstance(w.get("artifact"), str)
+            and isinstance(w.get("reason"), str) and w["reason"].strip()
+            and isinstance(w.get("evidence"), list)
+            and all(isinstance(e, str) for e in w["evidence"])]
+
+
+def _apply_waivers(findings, waivers):
+    """Flag rows whose (rule_id, artifact) carries a waiver: `waived` while
+    the set of matched evidence strings equals the snapshot, `reraised`
+    once it differs (D04 — not file sha, settings.json is rewritten
+    constantly). Drift rows are never waivable: their fingerprint is
+    sha-salted and they always name a decision."""
+    snap = {(w["rule_id"], w["artifact"]): set(w["evidence"]) for w in waivers}
+    cur = {}
+    for f in findings:
+        key = (f.get("rule_id"), f.get("artifact"))
+        if key in snap and not key[0].startswith("drift_"):
+            cur.setdefault(key, set()).add(f["evidence"])
+    for f in findings:
+        key = (f.get("rule_id"), f.get("artifact"))
+        if key in cur:
+            f["waived" if cur[key] == snap[key] else "reraised"] = True
+
+
+def add_scan_waiver(rule_id, artifact, reason, out):
+    """Waive the pair as it stands in the latest stored scan — no rescan;
+    the evidence set is snapshotted from those rows so the re-raise has a
+    baseline. Replaces an earlier waiver for the same pair (re-waiving a
+    re-raised finding re-snapshots it)."""
+    if rule_id.startswith("drift_"):
+        out.write("[ERROR] drift findings are not waivable — "
+                  "rebaseline or revert\n")
+        return 2
+    loaded = _load_latest_scan()
+    ev = sorted({f["evidence"] for f in (loaded[1] if loaded else [])
+                 if f.get("rule_id") == rule_id and f.get("artifact") == artifact})
+    if not ev:
+        out.write(f"[ERROR] no finding {rule_id} x {artifact} in the latest "
+                  "stored scan (artifact as `scan --report` prints it)\n")
+        return 2
+    waivers = [w for w in _waivers_raw()   # dep-audit rows ride along untouched
+               if not (isinstance(w, dict) and w.get("surface") == "config-audit"
+                       and (w.get("rule_id"), w.get("artifact")) == (rule_id, artifact))]
+    waivers.append({"surface": "config-audit", "rule_id": rule_id,
+                    "artifact": artifact, "reason": reason, "evidence": ev,
+                    "waived_at": store.now()})
+    p = _waivers_path()
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+        fh.write(json.dumps(waivers, indent=2))
+    store._chmod_private(p)
+    out.write(f"waived {rule_id} x {artifact} ({len(ev)} evidence)\n")
+    return 0
+
+
 # -- the scan ----------------------------------------------------------------
 
 def run_scan(roots=None, rebaseline=False, trigger="manual"):
@@ -560,14 +636,17 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
                                  "scan_id": scan_id, "fingerprint": fp,
                                  "resolved": True})
 
+    _apply_waivers(findings, load_scan_waivers())
+
     by_sev = {}
     for f in findings:
-        if not f.get("resolved"):
+        if not f.get("resolved") and not f.get("waived"):
             by_sev[f["severity"]] = by_sev.get(f["severity"], 0) + 1
     meta = {"scan_id": scan_id, "started_at": started, "ended_at": store.now(),
             "roots": [str(r) for r in (roots or [])] or ["<territories+cwd>"],
             "files_scanned": files_scanned, "files_skipped": skipped,
             "findings_by_severity": by_sev, "trigger": trigger,
+            "findings_waived": sum(1 for f in findings if f.get("waived")),
             "ruleset_sha256": scanrules.ruleset_sha256()}
 
     store._mkdir_private(d)
@@ -595,8 +674,9 @@ def _route_to_notifier(findings):
     info/low findings carry no decision and are record_only (AGENTS.md
     doctrine) — except drift, which always names one (rebaseline or revert).
     Resolved tombstone rows are bookkeeping, not findings — no rule_id, not
-    routed. Returns False when the notify layer is unavailable, and the
-    caller records that in meta so silence stays discoverable."""
+    routed. Waived rows are ledgered record_only (D06). Returns False when
+    the notify layer is unavailable, and the caller records that in meta so
+    silence stays discoverable."""
     try:
         from fs_coil import notify as fs_notify
     except Exception:   # noqa: BLE001 — no vendored tree, or a broken one;
@@ -612,8 +692,9 @@ def _route_to_notifier(findings):
             "config-audit", "scan_finding",
             f"{label}{f['rule_id']}: {f['artifact']}",
             actor_bucket=f["agent"],
-            record_only=(sev in ("info", "low")
-                         and not f["rule_id"].startswith("drift_")))
+            record_only=bool(f.get("waived")) or (
+                sev in ("info", "low")
+                and not f["rule_id"].startswith("drift_")))
     return True
 
 
@@ -635,11 +716,17 @@ def to_text(meta, findings):
                         -_SEVERITY_RANK.get(f["severity"], 0)):
             if _SEVERITY_RANK.get(f["severity"], 0) >= 2:
                 mark = "NEW" if f.get("new") else "known"
+                if f.get("waived"):
+                    mark += " waived"
+                elif f.get("reraised"):
+                    mark += " RERAISED"
                 lines.append(f"[{f['severity'].upper()}] {mark} {f['rule_id']} "
                              f"{f['artifact']}:{f['line']}  {f['evidence']}")
-        lines.append("findings: " + ", ".join(
-            f"{k}={sev[k]}" for k in
-            sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))))
+        counts = [f"{k}={sev[k]}" for k in
+                  sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))]
+        if meta.get("findings_waived"):
+            counts.append(f"waived={meta['findings_waived']}")
+        lines.append("findings: " + ", ".join(counts))
     resolved = sum(1 for f in findings if f.get("resolved"))
     if resolved:
         lines.append(f"resolved since last scan: {resolved}")
@@ -698,11 +785,19 @@ def cmd_scan(argv, out):
     p.add_argument("--rebaseline", action="store_true")
     p.add_argument("--report", action="store_true")
     p.add_argument("--patrol", dest="patrol_run", action="store_true")
+    p.add_argument("--waive", nargs=2, metavar=("RULE_ID", "ARTIFACT"))
+    p.add_argument("--reason")
     try:
         a = p.parse_args(argv)
     except ValueError as e:
         out.write(f"[ERROR] {e}\n")
         return 2
+    if a.waive:
+        if not (a.reason or "").strip() or a.roots or a.report or a.rebaseline:
+            out.write("[ERROR] --waive RULE_ID ARTIFACT --reason TEXT "
+                      "(reads the stored scan — no ROOT/--report/--rebaseline)\n")
+            return 2
+        return add_scan_waiver(a.waive[0], a.waive[1], a.reason, out)
     for r in a.roots:
         if not Path(os.path.expanduser(r)).exists():
             out.write(f"[ERROR] no such root: {r}\n")
@@ -724,7 +819,7 @@ def cmd_scan(argv, out):
     out.write({"text": to_text, "json": to_json}[a.fmt](meta, findings))
 
     threshold = _SEVERITY_RANK[a.fail_on]
-    breach = any(not f.get("resolved")
+    breach = any(not f.get("resolved") and not f.get("waived")
                  and _SEVERITY_RANK.get(f["severity"], 0) >= threshold
                  for f in findings)
     rc = 1 if breach else 0
