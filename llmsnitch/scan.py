@@ -134,8 +134,9 @@ def discover(roots=None):
                 add(p)
     else:
         home = Path(_HOME)
-        for prefixes in scanrules.TERRITORIES.values():
-            t = Path(os.path.expanduser(prefixes[0]))
+        terrs = [Path(os.path.expanduser(p[0]))
+                 for p in scanrules.TERRITORIES.values()]
+        for t in terrs:
             for single in (t / "settings.json", t / "settings.local.json",
                            t / "managed-settings.json", t / "mcp.json",
                            t / "CLAUDE.md"):
@@ -144,6 +145,17 @@ def discover(roots=None):
                 if (t / sub).is_dir():
                     for p in _walk(t / sub, budget):
                         add(p)
+        # Plugins (D10): depth measured from each plugin root (skills sit at
+        # depth 8 from ~/.claude). Second pass so one agent's plugin cache
+        # can't starve another's skills; marketplaces first (one clone each,
+        # artifact-dense); roots inside junk dirs (temp_git_*/.git) skipped.
+        for t in terrs:
+            for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
+                for root in sorted(t.glob(pat)):
+                    if (root.is_dir() and not root.is_symlink()
+                            and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
+                        for p in _walk(root, budget):
+                            add(p)
         add(home / ".claude.json")
         cwd = Path.cwd()
         for name in _INSTRUCTION_NAMES | {".mcp.json"}:
@@ -463,6 +475,11 @@ def _drift_finding(scan_id, art, cls, agent, change, sha, evidence=None):
 # -- novelty diff vs previous scan (spec §2.5 edge discipline) ---------------
 
 def _previous_fingerprints():
+    """{fingerprint: artifact} still open after every stored scan, oldest
+    first: a finding row opens, a tombstone closes. Folding the whole
+    history is what lets an out-of-scope finding carry forward (D11) —
+    a scan that neither re-emits nor tombstones it leaves it open.
+    None when no scan has ever run."""
     scans = store.base_dir() / "scans"
     try:
         dirs = sorted(d for d in scans.iterdir() if d.is_dir())
@@ -470,17 +487,25 @@ def _previous_fingerprints():
         return None
     if not dirs:
         return None
-    fps = set()
-    try:
-        for line in (dirs[-1] / "findings.ndjson").read_text().splitlines():
+    fps = {}
+    # ponytail: reads every scan dir each run; fine to thousands of daily
+    # patrols, upgrade path is a rolling open-set file if it ever shows.
+    for d in dirs:
+        try:
+            lines = (d / "findings.ndjson").read_text().splitlines()
+        except OSError:
+            continue
+        for line in lines:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(row, dict) and not row.get("resolved"):
-                fps.add(row.get("fingerprint"))
-    except OSError:
-        return None
+            if not isinstance(row, dict):
+                continue
+            if row.get("resolved"):
+                fps.pop(row.get("fingerprint"), None)
+            else:
+                fps[row.get("fingerprint")] = row.get("artifact")
     return fps
 
 
@@ -522,9 +547,18 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
         f["new"] = prev_fps is None or f["fingerprint"] not in prev_fps
         cur_fps.add(f["fingerprint"])
     if prev_fps:
-        for fp in sorted(prev_fps - cur_fps):
-            findings.append({"v": 1, "ts": store.now(), "scan_id": scan_id,
-                             "fingerprint": fp, "resolved": True})
+        # D11: a previous finding resolves only when its artifact was in
+        # this run's scope — discovered (targets, so a size-skipped file
+        # still counts) or gone from disk (the _drift removal test). An
+        # out-of-scope artifact is neither re-emitted nor tombstoned.
+        in_scope = {_display(p) for p, _, _ in targets}
+        for fp in sorted(prev_fps.keys() - cur_fps):
+            art = prev_fps[fp]
+            if art in in_scope or not (
+                    art and Path(os.path.expanduser(art)).exists()):
+                findings.append({"v": 1, "ts": store.now(),
+                                 "scan_id": scan_id, "fingerprint": fp,
+                                 "resolved": True})
 
     by_sev = {}
     for f in findings:
