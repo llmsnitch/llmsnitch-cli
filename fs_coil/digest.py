@@ -78,6 +78,7 @@ def health_report(now=None):
     return {"now": now, "patrol_ts": patrol, "depaudit_ts": dep_ts,
             "bulletin_age_days": age, "degraded": degraded, "problems": problems,
             "scan_findings": sev if isinstance(sev, dict) else {},
+            "scan_waived": _num((patrol_meta or {}).get("findings_waived")) or 0,
             "dep_findings": _num(dep.get("findings")) or 0,
             "dep_critical": _num(dep.get("findings_critical")) or 0}
 
@@ -136,15 +137,16 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
     sev = health.get("scan_findings", {})
     sc, sh, sl = sev.get("critical", 0), sev.get("high", 0), sev.get("low", 0)
     dc, dtot = health.get("dep_critical", 0), health.get("dep_findings", 0)
+    waived = f" · {health['scan_waived']} waived" if health.get("scan_waived") else ""
     if sc or sh or sl or dtot:
         parts = []
         if sc or sh or sl:
             parts.append(f"scan {sc}c/{sh}h/{sl}l (llmsnitch scan --report)")
         if dtot:
             parts.append(f"dep-audit {dc}c/{dtot} (llmsnitch depaudit)")
-        L += ["", "open findings (last patrol): " + " · ".join(parts)]
+        L += ["", "open findings (last patrol): " + " · ".join(parts) + waived]
     else:
-        L += ["", "open findings: none"]
+        L += ["", "open findings: none" + waived]
 
     L += ["", f"② new since last digest ({len(new)})"]
     items = sorted((_tier(first[k]), k) for k in new)
