@@ -1,7 +1,7 @@
 # Quiet Patrol — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN (charted 2026-09-18)`
+`status: OPEN (charted 2026-09-18; T701–T703 resolved 2026-09-18, T705 on the frontier, T704 blocked)`
 
 ## Destination
 
@@ -86,6 +86,30 @@ digest's open-findings line reads `0c/0h/0l · 2 waived`.
   carry forward silently. **D12 closing criterion** = as in Destination;
   the two residual waivers are granted from the CLI in T704 and the
   `.remember` accept records become history.
+- [T702 — Hook state class and semantic drift](tickets/T702-hook-state-and-semantic-drift.md)
+  — `hook_state` class (non-exec, non-script-ext under hooks): secret pass
+  only, never drift-tracked, stale `hook_script` baseline rows dropped;
+  `~/.claude.json` drift salt = sha of canonical `mcpServers` +
+  `projects[*].mcpServers`, evidence `mcpServers changed`. Three live scans
+  across a session: no drift on either file. First patrol after landing
+  emits one re-salt `drift_changed` on `~/.claude.json`, then quiet. +8 tests.
+- [T703 — Plugin coverage and scope-aware resolution](tickets/T703-plugin-coverage-and-scope-aware-resolution.md)
+  — plugin roots (`plugins/cache/*/*/*`, `plugins/marketplaces/*`) walked
+  in a second pass after all territories' core subs (a single pass starved
+  `~/.codex`); junk-nested roots skipped. Coverage from `$HOME` 74 → 596 of
+  672 plugin artifacts, total 204 → 723; budget overflow 2 → 17 — D10's
+  "budget not exhausted" was wrong, spun out as T705. Resolution folds every
+  stored scan into `{fingerprint: artifact}` and tombstones only when the
+  artifact was in scope or is gone from disk. +4 tests.
+- [T701 — Config-audit waivers](tickets/T701-config-audit-waivers.md) —
+  shared `waivers.json`, rows `{surface, rule_id, artifact, reason,
+  evidence[], waived_at}`; `scan --waive RULE_ID ARTIFACT --reason` (exit 2
+  on misuse, drift rules unwaivable, no rescan); waived rows kept, excluded
+  from breach, `record_only`, `known waived` / `known RERAISED` in text,
+  `findings_waived` in meta, digest `· N waived`. Orchestrator follow-up:
+  dep-audit's `add_waiver` rewrote the file from its filtered view and
+  would have dropped every scan row — fixed to append to the raw list
+  (+1 test). +6 tests. Suite 182 → 201.
 
 ## Not yet specified
 

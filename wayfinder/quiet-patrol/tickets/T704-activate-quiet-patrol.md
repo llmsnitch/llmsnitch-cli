@@ -2,7 +2,7 @@
 
 `labels: wayfinder:task`
 `parent: ../map.md`
-`blocked by: T701, T702, T703`
+`blocked by: T701, T702, T703, T705`
 `blocks: —`
 `status: OPEN — unclaimed`
 
