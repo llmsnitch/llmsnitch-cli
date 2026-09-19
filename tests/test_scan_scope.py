@@ -193,5 +193,39 @@ def test_cwd_control_files_outrank_plugin_cache():
         finally:
             scan._MAX_FILES = old
 
+
+def test_only_installed_plugin_version_walked():
+    """T705: per cached plugin, only the installed_plugins.json version is a
+    walk root; with no manifest entry the newest-mtime version is; a bare
+    plugins/<name>/ layout is a root; marketplaces stay whole."""
+    with tempfile.TemporaryDirectory() as td:
+        t = Path(td)
+        (t / "empty").mkdir()
+        cache = t / ".claude" / "plugins" / "cache" / "mkt"
+        def skill(*parts):
+            d = cache.joinpath(*parts) / "skills" / "s"
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text("---\nname: s\n---\nhi\n")
+            return d / "SKILL.md"
+        old_v, new_v = skill("plug", "1.0.0"), skill("plug", "2.0.0")
+        stale, newest = skill("orphan", "0.1"), skill("orphan", "0.2")
+        os.utime(stale.parents[2], (1, 1))
+        os.utime(newest.parents[2], (2_000_000_000, 2_000_000_000))
+        manifest = {"plugins": {"plug@mkt": [
+            {"installPath": str(cache / "plug" / "2.0.0"), "version": "2.0.0"}]}}
+        (t / ".claude" / "plugins" / "installed_plugins.json").write_text(
+            json.dumps(manifest))
+        bare = t / ".claude" / "plugins" / "bare" / "hooks"
+        bare.mkdir(parents=True)
+        (bare / "h.sh").write_text("#!/bin/sh\necho x\n")
+
+        def inner():
+            os.chdir(t / "empty")
+            found = {str(p) for p, _, _ in scan.discover()[0]}
+            assert str(new_v) in found and str(old_v) not in found, found
+            assert str(newest) in found and str(stale) not in found, found
+            assert str(bare / "h.sh") in found, found
+        _as_home(t, inner)
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

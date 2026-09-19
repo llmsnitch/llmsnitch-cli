@@ -112,6 +112,33 @@ def _walk(root, budget):
             yield Path(dirpath) / fn
 
 
+def _plugin_roots(t):
+    """Plugin walk roots under one territory (D10, amended by T705): every
+    marketplace clone first (one per marketplace, artifact-dense); per
+    cached plugin only the version the harness loads — installPath in
+    plugins/installed_plugins.json, newest mtime when the manifest is
+    silent — because stale versions are dead code and ~40% of the walk;
+    then bare plugins/<name>/ layouts. Unreadable manifest → mtime rule."""
+    roots = sorted(t.glob("plugins/marketplaces/*"))
+    try:
+        m = json.loads((t / "plugins" / "installed_plugins.json").read_text())
+        installed = {e.get("installPath") for v in (m.get("plugins") or {}).values()
+                     for e in (v or []) if isinstance(e, dict)}
+    except (OSError, ValueError, AttributeError):
+        installed = set()
+    for plug in sorted(t.glob("plugins/cache/*/*")):
+        try:
+            vers = sorted(v for v in plug.iterdir()
+                          if v.is_dir() and not v.is_symlink())
+            live = [v for v in vers if str(v) in installed]
+            roots += live or sorted(vers, key=lambda v: v.stat().st_mtime)[-1:]
+        except OSError:
+            continue
+    roots += [d for d in sorted(t.glob("plugins/*"))
+              if d.name not in ("cache", "marketplaces", "data")]
+    return roots
+
+
 def discover(roots=None):
     """[(path, artifact_class, agent)] — the seed inventory (spec §2.2).
     Without roots: notifier-registry territories + cwd. With roots: generic
@@ -152,21 +179,23 @@ def discover(roots=None):
             add(cwd / name)
         add(cwd / ".github" / "copilot-instructions.md")
         for sub in (".claude", ".agents"):
-            if (cwd / sub).is_dir():
+            # cwd == $HOME (the patrol): cwd/.claude *is* a territory, already
+            # covered by the passes above and below — walking it whole here
+            # would spend the budget on file-history/ before any plugin root.
+            if (cwd / sub).is_dir() and (cwd / sub) not in terrs:
                 for p in _walk(cwd / sub, budget):
                     add(p)
         # Plugins (D10): depth measured from each plugin root (skills sit at
         # depth 8 from ~/.claude). Last pass so a plugin cache can starve
         # neither another agent's skills nor the project's own .claude/
-        # control files (spec review 2026-09-18); marketplaces first (one
-        # clone each, artifact-dense); roots inside junk dirs skipped.
+        # control files (spec review 2026-09-18); roots inside junk dirs
+        # skipped.
         for t in terrs:
-            for pat in ("plugins/marketplaces/*", "plugins/cache/*/*/*"):
-                for root in sorted(t.glob(pat)):
-                    if (root.is_dir() and not root.is_symlink()
-                            and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
-                        for p in _walk(root, budget):
-                            add(p)
+            for root in _plugin_roots(t):
+                if (root.is_dir() and not root.is_symlink()
+                        and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
+                    for p in _walk(root, budget):
+                        add(p)
     return list(seen.values()), max(0, -budget[0])
 
 
