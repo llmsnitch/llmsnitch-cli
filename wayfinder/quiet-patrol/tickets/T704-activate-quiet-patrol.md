@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: T701, T702, T703, T705`
 `blocks: —`
-`status: OPEN — unclaimed`
+`status: CLAIMED (orchestrator session 8c9b46ea, 2026-09-19)`
 
 ## Question
 
