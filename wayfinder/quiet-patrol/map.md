@@ -1,7 +1,7 @@
 # Quiet Patrol — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN (charted 2026-09-18; T701–T703 and T705 resolved by 2026-09-19; T704 is the frontier, waits on merge to main + reinstall)`
+`status: ACTIVATED (charted 2026-09-18; T701–T705 resolved; live since 2026-09-19 12:13 — closes on the 2026-09-20 09:30 patrol per T704)`
 
 ## Destination
 
@@ -134,8 +134,27 @@ digest's open-findings line reads `0c/0h/0l · 2 waived`.
   when it is a territory root. From `$HOME`: 850 targets, 613 plugin
   artifacts, budget overflow 0 (was 723 / 596 / 17). T704 unblocked on
   the map side; still waits on the user's merge to main + reinstall.
+- [T704 — Activate quiet patrol](tickets/T704-activate-quiet-patrol.md) —
+  merged to main (`2711b8b`), reinstalled, two live patrols from `$HOME`:
+  first surfaced the one-shot 613-row coverage flood + 3 new non-drift rows
+  (receipts prose critical, two telegram parser-gap lows), all waived from
+  the CLI alongside the four standing rows → 7 waivers / 15 rows; second
+  patrol `waived=15`, nothing open, no state-file drift across a live
+  session; digest `open findings: none · 15 waived`. Closes on tomorrow's
+  scheduled patrol.
 
 ## Not yet specified
+
+- **`allowed-tools` YAML-list form** — `_frontmatter_allowed_tools` reads
+  the inline form only; a list (`- Bash`) parses as empty and fires
+  `skill_undeclared_bash` (hit on two own skills 09-18, two telegram
+  skills 09-19). Small rule fix; ticket when the next false positive costs
+  more than the fix.
+- **Marketplace clones scan uninstalled plugins** — `plugins/marketplaces/*`
+  holds every plugin a marketplace offers; only installed ones are loaded.
+  Whether to apply T705's installed-only rule there too (via
+  `installed_plugins.json` marketplace+name) is fog until the noise from
+  uninstalled clones is felt.
 
 - **`~/.llmsnitch/scans/` retention** — nothing prunes stored scans, and
   `_previous_fingerprints` now folds every one of them each run (linear
