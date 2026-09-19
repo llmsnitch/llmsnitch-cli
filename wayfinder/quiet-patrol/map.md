@@ -1,7 +1,7 @@
 # Quiet Patrol — Wayfinder Map
 
 `label: wayfinder:map`
-`status: OPEN (charted 2026-09-18; T701–T703 resolved 2026-09-18, T705 on the frontier, T704 blocked)`
+`status: OPEN (charted 2026-09-18; T701–T703 and T705 resolved by 2026-09-19; T704 is the frontier, waits on merge to main + reinstall)`
 
 ## Destination
 
@@ -125,6 +125,15 @@ digest's open-findings line reads `0c/0h/0l · 2 waived`.
   file name, `--waive` replacing an earlier waiver for the same pair. Spec
   digest example gained `· N waived`; one-time migration noise noted on
   T704. Suite 201 → 203.
+- [T705 — Plugin walk budget and layouts](tickets/T705-plugin-walk-budget.md)
+  — **D10 amended (user, Q15 = a)**: per cached plugin only the installed
+  version (`installed_plugins.json` installPath, newest-mtime fallback) is
+  a walk root; bare `plugins/<name>/` is a third root class; no cap change.
+  While measuring: the review's cwd-first ordering starved the patrol
+  (cwd == $HOME walks all of `~/.claude`) → the cwd sub-walk is skipped
+  when it is a territory root. From `$HOME`: 850 targets, 613 plugin
+  artifacts, budget overflow 0 (was 723 / 596 / 17). T704 unblocked on
+  the map side; still waits on the user's merge to main + reinstall.
 
 ## Not yet specified
 

@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: T703`
 `blocks: T704`
-`status: OPEN — unclaimed`
+`status: DONE (2026-09-19)`
 
 ## Question
 
@@ -37,3 +37,39 @@ artifacts (six `remember` versions = 2,187 files / 31 artifacts). Decide:
 
 Resolution amends D10 on the map; the code change (if any) lands as part
 of T704's pre-activation step or a small follow-up commit on this branch.
+
+## Resolution
+
+Decided 2026-09-19 by the user (grilling Q15): **(a)** — per cached
+plugin, walk only the version the harness loads, read from
+`plugins/installed_plugins.json` (`installPath`), newest-mtime fallback
+when the manifest is silent or unreadable; plus the bare
+`plugins/<name>/` layout as a third root class (`cache`, `marketplaces`
+and the harness's own `data/` dir excluded). No cap change. D10 amended.
+
+Built on this branch (`scan._plugin_roots`, +1 test in
+`tests/test_scan_scope.py`). Two things surfaced while measuring:
+
+- **cwd == $HOME starved the plugin pass.** The spec-review reorder
+  (cwd walk before plugins) meant the patrol's `_walk(~/.claude)` spent
+  the whole budget on `file-history/` and `projects/` before any plugin
+  root ran (live: plugins back to 74, overflow 26). The cwd `.claude` /
+  `.agents` sub-walk is now skipped when that path *is* a territory root
+  — the territory passes cover it. Three incidental files the old whole-
+  tree walk reached (`~/.claude/.claude/settings.local.json`,
+  `~/.claude/.mcp.json`, `~/.claude/plans/.claude/settings.local.json`)
+  are now permanently out of scope: none is a file the harness reads,
+  D11 carries their open findings forward, no tombstones.
+- **Symlink siblings win mtime ties.** A symlinked version dir shares
+  its target's mtime and sorted after it; symlinks are excluded from the
+  version candidates (they are skipped as roots anyway).
+
+Measured from `$HOME`, read-only `discover()`:
+
+| | before T703 | T703 | T705 |
+|---|---|---|---|
+| targets | 204 | 723 | 850 |
+| plugin artifacts | 74 | 596 | 613 |
+| budget overflow | 2 | 17 | 0 |
+
+`ralph-wiggum/hooks/*` (bare layout) reached again. Suite 203 → 204.
