@@ -3,6 +3,7 @@
   llmsnitch scan [ROOT ...] [--format text|json]
                  [--fail-on critical|high|medium]
                  [--rebaseline] [--report] [--patrol]
+                 [--waive RULE_ID ARTIFACT --reason TEXT]
 
 --report renders the LATEST STORED scan — no re-scan, no baseline
 mutation — so reviewing a drift finding never destroys the evidence it
@@ -62,7 +63,15 @@ def _agent_bucket(path):
 
 
 def classify(path):
-    """Artifact class for a path, or None if not an agent artifact."""
+    """Artifact class for a path, or None if not an agent artifact.
+
+    Classes: skill_manifest, claude_settings, mcp_config, hook_script,
+    hook_state, instruction_file, skill_script. Under a hooks dir, a file
+    that is executable or carries a script extension is a hook_script
+    (control surface); anything else is Hook state — data a hook writes at
+    runtime (signal files, per-session markers, a config it reads back).
+    Hook state is scanned for secrets only and never drift-fingerprinted
+    (quiet-patrol D08)."""
     name = path.name
     parts = path.parts
     if name == "SKILL.md":
@@ -73,7 +82,9 @@ def classify(path):
             or name == ".mcp.json" or name == "mcp.json":
         return "mcp_config"
     if "hooks" in parts and ".claude" in parts:
-        return "hook_script"
+        if path.suffix in _SCRIPT_EXTS or os.access(path, os.X_OK):
+            return "hook_script"
+        return "hook_state"
     if name in _INSTRUCTION_NAMES:
         return "instruction_file"
     if path.suffix in _SCRIPT_EXTS and (
@@ -101,6 +112,33 @@ def _walk(root, budget):
             yield Path(dirpath) / fn
 
 
+def _plugin_roots(t):
+    """Plugin walk roots under one territory (D10, amended by T705): every
+    marketplace clone first (one per marketplace, artifact-dense); per
+    cached plugin only the version the harness loads — installPath in
+    plugins/installed_plugins.json, newest mtime when the manifest is
+    silent — because stale versions are dead code and ~40% of the walk;
+    then bare plugins/<name>/ layouts. Unreadable manifest → mtime rule."""
+    roots = sorted(t.glob("plugins/marketplaces/*"))
+    try:
+        m = json.loads((t / "plugins" / "installed_plugins.json").read_text())
+        installed = {e.get("installPath") for v in (m.get("plugins") or {}).values()
+                     for e in (v or []) if isinstance(e, dict)}
+    except (OSError, ValueError, AttributeError):
+        installed = set()
+    for plug in sorted(t.glob("plugins/cache/*/*")):
+        try:
+            vers = sorted(v for v in plug.iterdir()
+                          if v.is_dir() and not v.is_symlink())
+            live = [v for v in vers if str(v) in installed]
+            roots += live or sorted(vers, key=lambda v: v.stat().st_mtime)[-1:]
+        except OSError:
+            continue
+    roots += [d for d in sorted(t.glob("plugins/*"))
+              if d.name not in ("cache", "marketplaces", "data")]
+    return roots
+
+
 def discover(roots=None):
     """[(path, artifact_class, agent)] — the seed inventory (spec §2.2).
     Without roots: notifier-registry territories + cwd. With roots: generic
@@ -124,8 +162,9 @@ def discover(roots=None):
                 add(p)
     else:
         home = Path(_HOME)
-        for prefixes in scanrules.TERRITORIES.values():
-            t = Path(os.path.expanduser(prefixes[0]))
+        terrs = [Path(os.path.expanduser(p[0]))
+                 for p in scanrules.TERRITORIES.values()]
+        for t in terrs:
             for single in (t / "settings.json", t / "settings.local.json",
                            t / "managed-settings.json", t / "mcp.json",
                            t / "CLAUDE.md"):
@@ -140,9 +179,23 @@ def discover(roots=None):
             add(cwd / name)
         add(cwd / ".github" / "copilot-instructions.md")
         for sub in (".claude", ".agents"):
-            if (cwd / sub).is_dir():
+            # cwd == $HOME (the patrol): cwd/.claude *is* a territory, already
+            # covered by the passes above and below — walking it whole here
+            # would spend the budget on file-history/ before any plugin root.
+            if (cwd / sub).is_dir() and (cwd / sub) not in terrs:
                 for p in _walk(cwd / sub, budget):
                     add(p)
+        # Plugins (D10): depth measured from each plugin root (skills sit at
+        # depth 8 from ~/.claude). Last pass so a plugin cache can starve
+        # neither another agent's skills nor the project's own .claude/
+        # control files (spec review 2026-09-18); roots inside junk dirs
+        # skipped.
+        for t in terrs:
+            for root in _plugin_roots(t):
+                if (root.is_dir() and not root.is_symlink()
+                        and _SKIP_DIRS.isdisjoint(root.relative_to(t).parts)):
+                    for p in _walk(root, budget):
+                        add(p)
     return list(seen.values()), max(0, -budget[0])
 
 
@@ -374,56 +427,90 @@ def _save_baseline(baseline):
     store._chmod_private(p)
 
 
+def _drift_salt(art, sha):
+    """What the baseline tracks for an artifact: its content sha, except
+    ~/.claude.json — Claude Code rewrites it every session (numStartups,
+    tips, project history), so drift there is semantic: the sha of the
+    canonical JSON of mcpServers + projects[*].mcpServers (quiet-patrol
+    D09). Unparseable JSON falls back to the whole-file sha."""
+    if Path(art).name != ".claude.json":
+        return sha
+    try:
+        doc = json.loads(Path(os.path.expanduser(art)).read_text())
+        subset = {"mcpServers": doc.get("mcpServers"),
+                  "projects": {k: v["mcpServers"]
+                               for k, v in doc.get("projects", {}).items()
+                               if isinstance(v, dict) and "mcpServers" in v}}
+    except Exception:   # noqa: BLE001 — malformed file: fall back, never raise
+        return sha
+    return hashlib.sha256(json.dumps(
+        subset, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _drift(scan_id, baseline, current, rebaseline):
     """config_drift findings vs baseline; mutates baseline to current.
-    First scan (empty baseline) and --rebaseline seed silently."""
+    First scan (empty baseline) and --rebaseline seed silently. Baseline
+    entries hold the drift salt under "sha256" (see _drift_salt)."""
     findings = []
     seeded = not baseline
     now = store.now()
     for key, (sha, cls, agent) in current.items():
+        if cls == "hook_state":   # D08: runtime data, never fingerprinted
+            continue
         prev = baseline.get(key)
         art = key.split("\x1f", 1)[1]
+        salt = _drift_salt(art, sha)
         if prev is None:
-            baseline[key] = {"sha256": sha, "first_seen_ts": now}
+            baseline[key] = {"sha256": salt, "first_seen_ts": now}
             if not seeded and not rebaseline:
                 findings.append(_drift_finding(scan_id, art, cls, agent,
-                                               "added", sha))
-        elif prev.get("sha256") != sha:
-            baseline[key] = {"sha256": sha,
+                                               "added", salt))
+        elif prev.get("sha256") != salt:
+            baseline[key] = {"sha256": salt,
                              "first_seen_ts": prev.get("first_seen_ts", now)}
             if not rebaseline:
-                findings.append(_drift_finding(scan_id, art, cls, agent,
-                                               "changed", sha))
+                findings.append(_drift_finding(
+                    scan_id, art, cls, agent, "changed", salt,
+                    "mcpServers changed" if salt != sha else None))
     for key in list(baseline):
-        if key not in current:
-            cls = key.split("\x1f", 1)[0]
-            art = key.split("\x1f", 1)[1]
-            if not Path(os.path.expanduser(art)).exists():
-                del baseline[key]
-                if not rebaseline:
-                    # Attribute removals to the same territory add/change use —
-                    # a hard-coded "unknown" here splits one agent's drift
-                    # across two ledger buckets (visible in every digest).
-                    agent = _agent_bucket(os.path.expanduser(art))
-                    findings.append(_drift_finding(scan_id, art, cls,
-                                                   agent, "removed", ""))
+        if key in current:
+            continue
+        cls, art = key.split("\x1f", 1)
+        p = Path(os.path.expanduser(art))
+        if p.exists():
+            if classify(p) == "hook_state":   # D08: a stale hook_script
+                del baseline[key]              # entry, now state — no tombstone
+            continue
+        del baseline[key]
+        if not rebaseline:
+            # Attribute removals to the same territory add/change use —
+            # a hard-coded "unknown" here splits one agent's drift
+            # across two ledger buckets (visible in every digest).
+            agent = _agent_bucket(os.path.expanduser(art))
+            findings.append(_drift_finding(scan_id, art, cls,
+                                           agent, "removed", ""))
     return findings
 
 
-def _drift_finding(scan_id, art, cls, agent, change, sha):
+def _drift_finding(scan_id, art, cls, agent, change, sha, evidence=None):
     control = cls in scanrules.CONTROL_CLASSES
     cat = "config_drift" if control else "scan_hygiene"
     sev = "high" if control else "low"
     return {"v": 1, "ts": store.now(), "scan_id": scan_id,
             "rule_id": f"drift_{change}", "category": cat, "severity": sev,
             "artifact": art, "artifact_class": cls, "agent": agent,
-            "line": 0, "evidence": change, "sha256": sha,
+            "line": 0, "evidence": evidence or change, "sha256": sha,
             "fingerprint": _fingerprint(f"drift_{change}", art, sha)}
 
 
 # -- novelty diff vs previous scan (spec §2.5 edge discipline) ---------------
 
 def _previous_fingerprints():
+    """{fingerprint: artifact} still open after every stored scan, oldest
+    first: a finding row opens, a tombstone closes. Folding the whole
+    history is what lets an out-of-scope finding carry forward (D11) —
+    a scan that neither re-emits nor tombstones it leaves it open.
+    None when no scan has ever run."""
     scans = store.base_dir() / "scans"
     try:
         dirs = sorted(d for d in scans.iterdir() if d.is_dir())
@@ -431,18 +518,89 @@ def _previous_fingerprints():
         return None
     if not dirs:
         return None
-    fps = set()
-    try:
-        for line in (dirs[-1] / "findings.ndjson").read_text().splitlines():
+    fps = {}
+    # ponytail: reads every scan dir each run; fine to thousands of daily
+    # patrols, upgrade path is a rolling open-set file if it ever shows.
+    for d in dirs:
+        try:
+            lines = (d / "findings.ndjson").read_text().splitlines()
+        except OSError:
+            continue
+        for line in lines:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(row, dict) and not row.get("resolved"):
-                fps.add(row.get("fingerprint"))
-    except OSError:
-        return None
+            if not isinstance(row, dict):
+                continue
+            if row.get("resolved"):
+                fps.pop(row.get("fingerprint"), None)
+            else:
+                fps[row.get("fingerprint")] = row.get("artifact")
     return fps
+
+
+# -- waivers -----------------------------------------------------------------
+
+def load_scan_waivers():
+    """Well-formed config-audit rows only (D05: the file is shared with
+    dep-audit, each loader filters its own shape). Malformed rows are
+    ignored, never trusted to silence."""
+    return [w for w in store.waivers_raw()
+            if isinstance(w, dict) and w.get("surface") == "config-audit"
+            and isinstance(w.get("rule_id"), str)
+            and isinstance(w.get("artifact"), str)
+            and isinstance(w.get("reason"), str) and w["reason"].strip()
+            and isinstance(w.get("evidence"), list)
+            and all(isinstance(e, str) for e in w["evidence"])]
+
+
+def _apply_waivers(findings, waivers):
+    """Flag rows whose (rule_id, artifact) carries a waiver: `waived` while
+    the set of matched evidence strings equals the snapshot, `reraised`
+    once it differs (D04 — not file sha, settings.json is rewritten
+    constantly). Drift rows are never waivable: their fingerprint is
+    sha-salted and they always name a decision."""
+    snap = {(w["rule_id"], w["artifact"]): set(w["evidence"]) for w in waivers}
+    cur = {}
+    for f in findings:
+        key = (f.get("rule_id"), f.get("artifact"))
+        if key in snap and not key[0].startswith("drift_"):
+            cur.setdefault(key, set()).add(f["evidence"])
+    for f in findings:
+        key = (f.get("rule_id"), f.get("artifact"))
+        if key in cur:
+            f["waived" if cur[key] == snap[key] else "reraised"] = True
+
+
+def add_scan_waiver(rule_id, artifact, reason, out):
+    """Waive the pair as it stands in the latest stored scan — no rescan;
+    the evidence set is snapshotted from those rows so the re-raise has a
+    baseline. Replaces an earlier waiver for the same pair (re-waiving a
+    re-raised finding re-snapshots it)."""
+    if rule_id.startswith("drift_"):
+        out.write("[ERROR] drift findings are not waivable — "
+                  "rebaseline or revert\n")
+        return 2
+    loaded = _load_latest_scan()
+    ev = sorted({f["evidence"] for f in (loaded[1] if loaded else [])
+                 if f.get("rule_id") == rule_id and f.get("artifact") == artifact})
+    if not ev:
+        out.write(f"[ERROR] no finding {rule_id} x {artifact} in the latest "
+                  "stored scan (artifact as `scan --report` prints it)\n")
+        return 2
+    waivers = [w for w in store.waivers_raw()   # dep-audit rows ride along untouched
+               if not (isinstance(w, dict) and w.get("surface") == "config-audit"
+                       and (w.get("rule_id"), w.get("artifact")) == (rule_id, artifact))]
+    waivers.append({"surface": "config-audit", "rule_id": rule_id,
+                    "artifact": artifact, "reason": reason, "evidence": ev,
+                    "waived_at": store.now()})
+    p = store.waivers_path()
+    with os.fdopen(store._open_private(p, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+        fh.write(json.dumps(waivers, indent=2))
+    store._chmod_private(p)
+    out.write(f"waived {rule_id} x {artifact} ({len(ev)} evidence)\n")
+    return 0
 
 
 # -- the scan ----------------------------------------------------------------
@@ -483,18 +641,35 @@ def run_scan(roots=None, rebaseline=False, trigger="manual"):
         f["new"] = prev_fps is None or f["fingerprint"] not in prev_fps
         cur_fps.add(f["fingerprint"])
     if prev_fps:
-        for fp in sorted(prev_fps - cur_fps):
-            findings.append({"v": 1, "ts": store.now(), "scan_id": scan_id,
-                             "fingerprint": fp, "resolved": True})
+        # D11: a previous finding resolves only when its artifact was in
+        # this run's scope — discovered (targets, so a size-skipped file
+        # still counts) or gone from disk (the _drift removal test). An
+        # out-of-scope artifact is neither re-emitted nor tombstoned.
+        in_scope = {_display(p) for p, _, _ in targets}
+        # unattested_agent_* artifacts are directories the sweep probed:
+        # in scope when their parent is one of this run's discover roots.
+        swept = {_display(Path(os.path.expanduser(r))) for r in _discover_roots()}
+        for fp in sorted(prev_fps.keys() - cur_fps):
+            art = prev_fps[fp]
+            full = os.path.expanduser(art or "")
+            if (art in in_scope
+                    or (os.path.isdir(full) and os.path.dirname(art) in swept)
+                    or not (art and os.path.exists(full))):
+                findings.append({"v": 1, "ts": store.now(),
+                                 "scan_id": scan_id, "fingerprint": fp,
+                                 "resolved": True})
+
+    _apply_waivers(findings, load_scan_waivers())
 
     by_sev = {}
     for f in findings:
-        if not f.get("resolved"):
+        if not f.get("resolved") and not f.get("waived"):
             by_sev[f["severity"]] = by_sev.get(f["severity"], 0) + 1
     meta = {"scan_id": scan_id, "started_at": started, "ended_at": store.now(),
             "roots": [str(r) for r in (roots or [])] or ["<territories+cwd>"],
             "files_scanned": files_scanned, "files_skipped": skipped,
             "findings_by_severity": by_sev, "trigger": trigger,
+            "findings_waived": sum(1 for f in findings if f.get("waived")),
             "ruleset_sha256": scanrules.ruleset_sha256()}
 
     store._mkdir_private(d)
@@ -522,8 +697,9 @@ def _route_to_notifier(findings):
     info/low findings carry no decision and are record_only (AGENTS.md
     doctrine) — except drift, which always names one (rebaseline or revert).
     Resolved tombstone rows are bookkeeping, not findings — no rule_id, not
-    routed. Returns False when the notify layer is unavailable, and the
-    caller records that in meta so silence stays discoverable."""
+    routed. Waived rows are ledgered record_only (D06). Returns False when
+    the notify layer is unavailable, and the caller records that in meta so
+    silence stays discoverable."""
     try:
         from fs_coil import notify as fs_notify
     except Exception:   # noqa: BLE001 — no vendored tree, or a broken one;
@@ -539,8 +715,9 @@ def _route_to_notifier(findings):
             "config-audit", "scan_finding",
             f"{label}{f['rule_id']}: {f['artifact']}",
             actor_bucket=f["agent"],
-            record_only=(sev in ("info", "low")
-                         and not f["rule_id"].startswith("drift_")))
+            record_only=bool(f.get("waived")) or (
+                sev in ("info", "low")
+                and not f["rule_id"].startswith("drift_")))
     return True
 
 
@@ -562,11 +739,17 @@ def to_text(meta, findings):
                         -_SEVERITY_RANK.get(f["severity"], 0)):
             if _SEVERITY_RANK.get(f["severity"], 0) >= 2:
                 mark = "NEW" if f.get("new") else "known"
+                if f.get("waived"):
+                    mark += " waived"
+                elif f.get("reraised"):
+                    mark += " RERAISED"
                 lines.append(f"[{f['severity'].upper()}] {mark} {f['rule_id']} "
                              f"{f['artifact']}:{f['line']}  {f['evidence']}")
-        lines.append("findings: " + ", ".join(
-            f"{k}={sev[k]}" for k in
-            sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))))
+        counts = [f"{k}={sev[k]}" for k in
+                  sorted(sev, key=lambda s: -_SEVERITY_RANK.get(s, 0))]
+        if meta.get("findings_waived"):
+            counts.append(f"waived={meta['findings_waived']}")
+        lines.append("findings: " + ", ".join(counts))
     resolved = sum(1 for f in findings if f.get("resolved"))
     if resolved:
         lines.append(f"resolved since last scan: {resolved}")
@@ -625,11 +808,19 @@ def cmd_scan(argv, out):
     p.add_argument("--rebaseline", action="store_true")
     p.add_argument("--report", action="store_true")
     p.add_argument("--patrol", dest="patrol_run", action="store_true")
+    p.add_argument("--waive", nargs=2, metavar=("RULE_ID", "ARTIFACT"))
+    p.add_argument("--reason")
     try:
         a = p.parse_args(argv)
     except ValueError as e:
         out.write(f"[ERROR] {e}\n")
         return 2
+    if a.waive:
+        if not (a.reason or "").strip() or a.roots or a.report or a.rebaseline:
+            out.write("[ERROR] --waive RULE_ID ARTIFACT --reason TEXT "
+                      "(reads the stored scan — no ROOT/--report/--rebaseline)\n")
+            return 2
+        return add_scan_waiver(a.waive[0], a.waive[1], a.reason, out)
     for r in a.roots:
         if not Path(os.path.expanduser(r)).exists():
             out.write(f"[ERROR] no such root: {r}\n")
@@ -651,7 +842,7 @@ def cmd_scan(argv, out):
     out.write({"text": to_text, "json": to_json}[a.fmt](meta, findings))
 
     threshold = _SEVERITY_RANK[a.fail_on]
-    breach = any(not f.get("resolved")
+    breach = any(not f.get("resolved") and not f.get("waived")
                  and _SEVERITY_RANK.get(f["severity"], 0) >= threshold
                  for f in findings)
     rc = 1 if breach else 0

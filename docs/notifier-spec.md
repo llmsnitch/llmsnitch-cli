@@ -660,9 +660,11 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
     ledger lines the reader skipped as garbage.
   **open findings** — a one-line standing readout follows ① health:
     `open findings (last patrol): scan Nc/Nh/Nl (llmsnitch scan --report)
-    · dep-audit Nc/N (llmsnitch depaudit)`, sourced from the newest patrol
+    · dep-audit Nc/N (llmsnitch depaudit) · N waived`, sourced from the newest patrol
     `meta.json`'s `findings_by_severity` and `depaudit-state.json`
-    (`findings`, `findings_critical`). Pull-only — never banners, never
+    (`findings`, `findings_critical`); the `· N waived` suffix (from
+    `findings_waived`) appears only when a config-audit Waiver is in force.
+    Pull-only — never banners, never
     calls `notify()`. Persists regardless of the 7-day novelty window
     below, so a finding that has aged out of ② is still visible until
     resolved. Zero findings → `open findings: none`.

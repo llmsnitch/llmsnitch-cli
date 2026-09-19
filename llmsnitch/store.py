@@ -58,6 +58,21 @@ def _open_private(path, flags):
     return os.open(str(path), flags | os.O_CREAT, 0o600)
 
 
+def waivers_path():
+    return base_dir() / "waivers.json"
+
+
+def waivers_raw():
+    """Every row of the shared waivers file, any surface (D05,
+    wayfinder/quiet-patrol). Writers append to this, never to a filtered
+    view, or they silently drop the other surface's waivers."""
+    try:
+        raw = json.loads(waivers_path().read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    return raw if isinstance(raw, list) else []
+
+
 def append_event(session_id, event):
     p = session_dir(session_id) / "events.ndjson"
     fd = _open_private(p, os.O_WRONLY | os.O_APPEND)

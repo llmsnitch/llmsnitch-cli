@@ -4,7 +4,8 @@
   llmsnitch list              recorded sessions, newest first
   llmsnitch show <id>         one session: aggregates + recent events
   llmsnitch check             cost/fail-rate/health gate (exit 0/1/2)
-  llmsnitch scan [ROOT ...]   config audit over agent artifacts (exit 0/1/2)
+  llmsnitch scan [ROOT ...]   config audit over agent artifacts (exit 0/1/2);
+                              --waive RULE_ID ARTIFACT --reason TEXT adds a waiver
   llmsnitch depaudit          intakes x bulletin dep audit (exit 0/1/2);
                               --waive ID PACKAGE --reason TEXT adds a waiver
   llmsnitch patrol [--write]  print/install the daily scan LaunchAgent
