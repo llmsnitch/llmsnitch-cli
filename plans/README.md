@@ -24,6 +24,7 @@ local-only repo (never push), `trash` never `rm`, never run `install.sh`.
 | 010 | Ship the `fs-coil` entry point | P3 | S | 004 | DONE |
 | 011 | Unattested-agent discovery (close coverage gap) | P2 | M | — | DONE (steps 1–6; step 7 REJECTED — see notes) |
 | 012 | Digest finding-recall (standing open-findings readout) | P2 | M | — | DONE |
+| 013 | setup_cmd snapshot test-leak (add snap_dir kwarg) | P3 | XS | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 
