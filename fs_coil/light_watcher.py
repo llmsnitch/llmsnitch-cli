@@ -10,14 +10,11 @@ Trade-off vs. the eslogger deep mode:
     Endpoint Security (which requires FDA). If read-detection is critical
     for your threat model, use `fs-coil daemon` (deep mode) instead.
 
-Runs as the user via LaunchAgent. Reuses the same deny-list matcher,
-Logger, and Notifier as deep mode so log lines and alerts stay uniform.
+Runs as the user via LaunchAgent. Reuses deep mode's deny-list matcher and
+Logger; every hit goes through `fs_coil.notify` (the doctrine gate).
 """
 
-import configparser
-import fnmatch
 import os
-import re
 import signal
 import subprocess
 import sys
@@ -27,44 +24,56 @@ from fs_coil.denylist import (
     _shrink, compile_deny, is_sensitive_basename, match_deny, path_in_noise,
 )
 from fs_coil.logger import Logger
-from fs_coil.notifier import Notifier
+from fs_coil.notify import CATEGORIES, notify
 from fs_coil.runtime import console_user, user_home
 
-
-def load_notify_suppress(config_path="~/.config/llmsnitch/config"):
-    """Read [notify] suppress_* rules from user config.
-
-    Each `suppress_<name>` key defines a category whose comma-separated
-    fnmatch globs match against the full path. A matching write is logged
-    with a `suppressed=<name>` tag and never notifies. Malformed config
-    returns [] — the notifier stays fail-safe.
-    """
-    rules = []
-    try:
-        cp = configparser.ConfigParser(inline_comment_prefixes=("#",))
-        cp.read(os.path.expanduser(config_path))
-        if not cp.has_section("notify"):
-            return rules
-        for key, raw in cp["notify"].items():
-            if not key.startswith("suppress_"):
-                continue
-            category = key[len("suppress_"):]
-            globs = [os.path.expanduser(g.strip())
-                     for g in raw.split(",") if g.strip()]
-            if globs:
-                rules.append((category, globs))
-    except Exception:
-        pass
-    return rules
+# Territory table (CONTEXT.md). ponytail: mirrors llmsnitch/scanrules
+# .TERRITORIES by hand — fs_coil never imports llmsnitch; add `[agent.*]`
+# config merge only if a territory must change without a release.
+_TERRITORIES = {
+    "claude-code": ("~/.claude", "~/.claude.json"),
+    "codex":       ("~/.codex",),
+    "aider":       ("~/.aider",),
+    "copilot":     ("~/.copilot",),
+    "cursor":      ("~/.cursor",),
+    "windsurf":    ("~/.windsurf",),
+    "agy":         ("~/.agy",),
+}
+_CACHE_PATHS = {"claude-code": ("~/.claude/plugins/cache",)}
 
 
-def match_suppress(path, rules):
-    """Return category name if `path` matches any suppress glob, else None."""
-    for category, globs in rules:
-        for g in globs:
-            if fnmatch.fnmatch(path, g):
-                return category
-    return None
+def _inside(path, roots, home):
+    """Exact-segment prefix; single-file roots match by equality."""
+    roots = [home + r[1:] if r.startswith("~") else r for r in roots]
+    return any(path == r or path.startswith(r + "/") for r in roots)
+
+
+def classify_light(path, home):
+    """(category, actor_bucket) from the path alone — FSEvents carries no
+    pid, so light attributes territory, not actor (spec's named ceiling)."""
+    for agent, roots in _TERRITORIES.items():
+        if _inside(path, roots, home):
+            cache = _inside(path, _CACHE_PATHS.get(agent, ()), home)
+            return ("agent_plugin_cache" if cache else "agent_self"), agent
+    return "deny_write", "unknown"
+
+
+def route_hit(path, kind, hit, home, *, stdout_only=False, now=None):
+    """One deny hit → one notify() call → (category, actor, notified).
+    Low severity names no decision → record_only (scan.py's precedent);
+    foreground `fs-coil light` ledgers but never banners."""
+    category, actor = classify_light(path, home)
+    low = CATEGORIES[category][1] == "low"
+    subject = _shrink(path, home)
+    notified = notify(
+        "fs-coil-light", category, subject,
+        actor_bucket=actor, deny_pattern=hit,
+        record_only=low or stdout_only,
+        message=(f"{subject}\nevent: {kind}\nrule: {hit}\n"
+                 f"action: {CATEGORIES[category][2]}\n"
+                 "(light mode: writes only — no read-detection)"),
+        _now=now)
+    return category, actor, notified
 
 # Default paths — sensitive credential / config dirs the invoking user
 # owns and can read without any special TCC grant.
@@ -129,8 +138,6 @@ def run_light_monitor(paths=None, stdout_only=False):
     home = user_home(user) if user else os.path.expanduser("~")
     deny = compile_deny(home)
     logger = Logger(user)
-    notifier = Notifier()
-    suppress_rules = load_notify_suppress()
 
     fswatch = find_fswatch()
     if fswatch is None:
@@ -152,12 +159,6 @@ def run_light_monitor(paths=None, stdout_only=False):
         f"(user={user or 'none'}, paths={len(watched)}, rules={len(deny)}, "
         f"reads=UNAVAILABLE)"
     )
-    if not stdout_only:
-        notifier.notify(
-            "🐍 fs-coil (light) armed",
-            f"watching {len(watched)} paths — writes only, no reads",
-            "startup",
-        )
 
     # fswatch -x: include event flag column(s). -r: recursive.
     # --event-flags plus one-event-per-line is the default; -x prepends flags.
@@ -200,32 +201,18 @@ def run_light_monitor(paths=None, stdout_only=False):
                 continue
 
             kind = flags[0].lower() if flags else "modified"
-            suppressed = match_suppress(path, suppress_rules)
-            line = (
+            # Every hit is ledgered; the gate decides whether it banners.
+            category, actor, notified = route_hit(
+                path, kind, hit, home, stdout_only=stdout_only)
+            logger.write(
                 f"[{datetime.now():%Y-%m-%d %H:%M:%S}] DENY-MATCH "
-                f"proc=?[0] src=light sign=- severity=high "
+                f"proc=?[0] src=light sign=- "
+                f"severity={CATEGORIES[category][1]} "
                 f"parent=?[0] daemon=no "
-                f"event={kind} mode={mode} path={path} pattern={hit}"
-                + (f" suppressed={suppressed}" if suppressed else "")
+                f"event={kind} mode={mode} path={path} pattern={hit} "
+                f"category={category} actor={actor} "
+                f"notified={'yes' if notified else 'no'}"
             )
-            logger.write(line)
-
-            # Suppressed events are logged (recall via `fs-coil noise`) but
-            # never notify — the AGENTS.md actionability rule: no page
-            # without a decision the user can act on.
-            if not stdout_only and not suppressed:
-                title = "🐍 fs-coil (light) · W"
-                message = (
-                    f"{_shrink(path, home)}\n"
-                    f"event: {kind}\n"
-                    f"rule: {hit}\n"
-                    f"(light mode: writes only — no read-detection)"
-                )
-                notifier.notify(
-                    title=title,
-                    message=message,
-                    key=("light", mode, path),
-                )
         except Exception as e:
             logger.write(
                 f"[{datetime.now():%Y-%m-%d %H:%M:%S}] EVENT-ERROR "
