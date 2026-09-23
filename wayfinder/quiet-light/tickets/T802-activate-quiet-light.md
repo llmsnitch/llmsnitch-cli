@@ -13,17 +13,19 @@ runs the root-owned Aug 26 tree via `/usr/local/bin/fs-coil`; the fix is to
 point the user LaunchAgent at the pipx install, which tracks `main`. No
 sudo, no `install.sh`.
 
-1. Merge `feature/reduce-notification-noise` into `main` (`~/llmsnitch-cli`)
-   and reinstall: `pipx install --force ~/llmsnitch-cli`. Check
-   `~/.local/bin/fs-coil --help` runs.
-2. Edit `~/Library/LaunchAgents/com.slav-it.fs-coil.plist`:
-   `ProgramArguments[0]` from `/usr/local/bin/fs-coil` to
-   `$HOME.local/bin/fs-coil` (launchd does not expand `~`).
-3. Reload the agent:
+1. ✅ 2026-09-22 20:25 — `main` fast-forwarded to T801 (`~/llmsnitch-cli`),
+   suite green from main, wheel builds. ✅ Plist
+   `~/Library/LaunchAgents/com.slav-it.fs-coil.plist` `ProgramArguments[0]`
+   repointed to `$HOME.local/bin/fs-coil` (launchd does not
+   expand `~`). The running process is still the old tree until step 3.
+2. Before-picture (optional): `terminal-notifier -list ALL | grep -c
+   'fs-coil (light)'` — ~100 undismissed plugin-cache banners from today.
+   Reinstall: `pipx install --force ~/llmsnitch-cli`; check
+   `~/.local/bin/fs-coil --help` lists `light-agent`.
+3. Restart the agent so launchd re-reads the plist:
 
    ```bash
-   launchctl bootout gui/$(id -u)/com.slav-it.fs-coil
-   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.slav-it.fs-coil.plist
+   launchctl kickstart -k gui/$(id -u)/com.slav-it.fs-coil
    ps -axo pid,command | grep '[f]s-coil light-agent'     # must show .local/bin
    ```
 

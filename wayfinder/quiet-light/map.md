@@ -120,6 +120,19 @@ write still pages.
   684 `agent_plugin_cache` + 13 `agent_self`, 0 banners; all September's
   would-be banners are `~/.zprofile` / `~/.profile` / `~/.zshrc` writes,
   one to four a day. Live agent unchanged until T802.
+- **D06 sharpened — one installed tree (2026-09-22 20:25)**: the pipx
+  install `~/.local/bin/fs-coil` (→ `~/Library/Application
+  Support/pipx/venvs/llmsnitch`) is the *only* tree launchd runs; the
+  root-owned `/usr/local/share/llmsnitch/` + `/usr/local/bin/fs-coil` are
+  retired from the light agent and stay on disk as history until a sudo
+  session trashes them (fog). Cross-map: `wayfinder/notification-click/`
+  (branch `feature/notification-click-action`, `21f9e8c`) verified the same
+  facts — its T902 defers to whichever activation lands first; its T901
+  edits `notifier.py` / `notify._deliver` only, so no conflict with T801.
+  Reload verb is `launchctl kickstart -k gui/$(id -u)/com.slav-it.fs-coil`
+  (plist already loaded; bootout/bootstrap only if the label is missing).
+  Plist repointed by this session; `pipx install --force` + kickstart are
+  the user's.
 
 ## Tickets
 
