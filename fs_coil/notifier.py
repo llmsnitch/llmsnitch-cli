@@ -25,6 +25,23 @@ def _icon_key(actor):
     return re.sub(r"[^a-z0-9._-]", "_", (actor or "").lower())[:64]
 
 
+def _argv(title, message, group, icon, open_url, root):
+    """terminal-notifier argv. root=(uid, user) when posting from the
+    LaunchDaemon into the console user's session. open_url is what a
+    click opens (wayfinder/notification-click D01); it is stored with the
+    notification and fired in the GUI session, so root needs nothing more.
+    (-sender was removed in terminal-notifier 3.0 — D04.)"""
+    cmd = []
+    if root:
+        cmd += ["/bin/launchctl", "asuser", str(root[0]), "/usr/bin/sudo", "-u", root[1]]
+    cmd += [TERMINAL_NOTIFIER, "-title", title, "-message", message, "-group", group]
+    if icon:
+        cmd += ["-contentImage", icon]
+    if open_url:
+        cmd += ["-open", open_url]
+    return cmd
+
+
 class Notifier:
     def __init__(self):
         self._last = {}   # dedupe (proc, kind, path) → timestamp
@@ -124,7 +141,7 @@ class Notifier:
         return True
 
     def notify(self, title, message, key,
-               icon_actor=None, exe_path=None, rexe_path=None):
+               icon_actor=None, exe_path=None, rexe_path=None, open_url=None):
         if not self._should_emit(key):
             return
         if not os.path.exists(TERMINAL_NOTIFIER):
@@ -139,26 +156,8 @@ class Notifier:
         # group, so repeated matches only ever show one notification.
         group = f"{PLIST_LABEL}.{int(time.time() * 1000)}"
         icon = self._resolve_icon(icon_actor, exe_path, rexe_path) if icon_actor else None
-        if os.geteuid() == 0 and self._uid is not None:
-            # root → user session
-            cmd = [
-                "/bin/launchctl", "asuser", str(self._uid),
-                "/usr/bin/sudo", "-u", self._user,
-                TERMINAL_NOTIFIER,
-                "-title", title,
-                "-message", message,
-                "-group", group,
-                "-sender", "com.apple.Terminal",
-            ]
-        else:
-            cmd = [
-                TERMINAL_NOTIFIER,
-                "-title", title,
-                "-message", message,
-                "-group", group,
-            ]
-        if icon:
-            cmd += ["-contentImage", icon]
+        root = (self._uid, self._user) if os.geteuid() == 0 and self._uid is not None else None
+        cmd = _argv(title, message, group, icon, open_url, root)
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:

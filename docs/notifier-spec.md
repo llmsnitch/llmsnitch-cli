@@ -604,6 +604,12 @@ from fields when the caller passes no `title`/`message`):
   `-group` suffix per banner (macOS otherwise collapses repeats),
   `launchctl asuser <uid> sudo -u <user>` when running as root, icon
   resolution unchanged. Delete only `_should_emit`/`_last`/`_cooldown`.
+- **Click** (`wayfinder/notification-click`, 2026-09-22): every banner
+  carries `-open file://<newest digest-YYYY-MM-DD.txt>` — a click opens
+  the digest in the default text editor; no digest yet (first day) → no
+  click action. The URL derives from the directory listing only, never
+  from the row. `-sender` was removed in terminal-notifier 3.0 and is no
+  longer passed.
 
 ### 2. On-demand CLI recall — `fs-coil noise`
 

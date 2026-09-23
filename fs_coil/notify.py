@@ -289,18 +289,32 @@ def _critical_patterns(cfg):
     return CRITICAL_DENY_PATTERNS | {p.strip() for p in raw.split(",") if p.strip()}
 
 
+def _click_url():
+    """What a banner click opens: the newest digest file, or None on the
+    first day (wayfinder/notification-click D01/D02). A function of the
+    directory listing only — never of the row (D03). Best-effort: the
+    click is not the banner."""
+    try:
+        from fs_coil.digest import _digest_files
+        files = _digest_files(_notify_dir())
+        return "file://" + files[-1] if files else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _deliver(surface, category, subject, actor_bucket, deny_pattern,
              title, message, icon_actor, exe_path, rexe_path):
     """Step 7: post via the existing Notifier NC mechanics. Fresh instance
     per call — its legacy cooldown is per-instance and empty (D24)."""
-    from fs_coil.notifier import Notifier
+    from fs_coil import notifier
     glyph = _GLYPH.get(surface, "🐍")
     action = CATEGORIES[category][2]
-    Notifier().notify(
+    notifier.Notifier().notify(
         title or f"{glyph} {actor_bucket} · {category}",
         message or f"{subject}\nrule: {deny_pattern or '-'}\naction: {action}",
         key=(surface, category, subject),
-        icon_actor=icon_actor, exe_path=exe_path, rexe_path=rexe_path)
+        icon_actor=icon_actor, exe_path=exe_path, rexe_path=rexe_path,
+        open_url=_click_url())
 
 
 def notify(surface, category, subject, *,
