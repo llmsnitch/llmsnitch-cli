@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T902`
-`status: OPEN`
+`status: DONE (2026-09-22)`
 
 ## Question
 
@@ -55,4 +55,37 @@ lists it; clicking it opens the digest in the default text editor.
 
 ## Answer
 
-<!-- filled at resolution: what was built, test count, review outcomes -->
+Built in two commits (`f0d221c`, then the review follow-up). Deviations
+from the plan above, all from the two-axis `code-review` (7 findings) and
+`ponytail-review` (4):
+
+- **The click default lives in `Notifier.notify`**, not `_deliver`: with
+  `open_url=None` every banner — including the direct `Notifier()` callers
+  in `monitor.py` and `light_watcher.py` — gets `-open <newest digest>`.
+  `_deliver` passes nothing, which is how D03 is enforced structurally
+  (there is no row-derived input to the URL; the test asserts the kwarg is
+  absent).
+- **`ledger.digest_files(d)`** is the shared newest-digest lister (date
+  regex `^digest-\d{4}-\d{2}-\d{2}\.txt$`, replacing digest.py's `?`-glob
+  that let `digest-zzzz-zz-zz.txt` sort newest). `digest.py` and
+  `notifier.py` both import it; the delivery path no longer imports
+  `digest`.
+- **URL via `Path(...).as_uri()`** — a space or `#` in the notify dir
+  would otherwise make terminal-notifier reject the whole banner, not
+  just the click.
+- Kept the best-effort `try/except` in `_click_url` (monitor.py's read
+  loop must never see an exception) but the test now covers it by making
+  the lister raise, instead of a chmod-000 dir that `listdir` errors
+  swallow anyway.
+- Dropped the redundant end-to-end test the reviewer and ponytail both
+  flagged; replaced with one that drives the REAL `_deliver` through
+  `notify()` with a fake `Notifier`.
+
+Tests: 5 in `tests/test_click.py`, suite 204 → 209, exit 0. `-sender`
+gone from `fs_coil/`. Spec §"Delivery outlets" 1 amended. Live check on
+this Mac: `_click_url()` → today's `digest-2026-09-22.txt`; one test
+banner posted with that URL for the T902 click.
+
+Deferred, recorded on the map: leading `[`/`(`/quote in a `-message`
+value makes terminal-notifier fail to read it (its own help text); a
+pre-existing banner-loss path, not a click concern.

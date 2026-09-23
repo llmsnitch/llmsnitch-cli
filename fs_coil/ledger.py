@@ -15,6 +15,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 _FILE_RE = re.compile(r"^events-(\d{4}-\d{2}-\d{2})\.ndjson$")
+_DIGEST_RE = re.compile(r"^digest-\d{4}-\d{2}-\d{2}\.txt$")
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -30,6 +31,17 @@ def ledger_dir() -> str:
     """Return the notify ledger directory (no mkdir)."""
     from fs_coil.notify import _notify_dir
     return _notify_dir()
+
+
+def digest_files(d):
+    """Dated digest files in d, oldest → newest. Date-shaped names only —
+    the directory is user-writable, so a stray `digest-latest.txt` must
+    not become the newest digest (T901 review)."""
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return []
+    return [os.path.join(d, n) for n in sorted(names) if _DIGEST_RE.match(n)]
 
 
 def iter_rows(start_ts, end_ts, *, dir_path=None):

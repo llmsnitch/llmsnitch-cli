@@ -1,7 +1,7 @@
 # Notification Click — Wayfinder Map
 
 `label: wayfinder:map`
-`status: CHARTED (2026-09-22) — T901 build is the frontier; closes on T902's criteria`
+`status: BUILT (2026-09-22) — T901 done; T902 activate is the user's; closes on T902's criteria`
 
 ## Destination
 
@@ -109,9 +109,18 @@ open.
   built by a pure function** so the test asserts on the list (`-open`
   present with a digest, absent without, `-sender` absent in both
   branches) without posting a banner.
-- Tickets: [T901 — Build the click action](tickets/T901-build-click-action.md)
-  (frontier); [T902 — Activate](tickets/T902-activate-click.md) (user:
-  reinstall, one real click).
+- [T901 — Build the click action](tickets/T901-build-click-action.md) —
+  `Notifier.notify` defaults `open_url` to the newest digest as a
+  `file://` URI (`Path.as_uri`, so odd paths cannot sink the banner);
+  every caller gets it, `_deliver` passes nothing (D03 structural);
+  `ledger.digest_files` is the shared date-regex lister, fixing digest's
+  `?`-glob newest pick too; `-sender` deleted; argv is a pure function.
+  Two-axis review 7 findings → 6 fixed, 1 deferred (below). +5 tests,
+  suite 209. **D02 amended**: resolution happens in `Notifier`, not
+  `_deliver`.
+- [T902 — Activate](tickets/T902-activate-click.md) — user: merge,
+  reinstall, one real click; shares the one-installed-tree step with
+  quiet-light T802.
 
 ## Not yet specified
 
@@ -125,6 +134,13 @@ open.
   `/usr/local` tree; repoint at the pipx shim or re-sync is a T902 step
   here and a T802 step on quiet-light. The *policy* is shared fog; decide
   once, in whichever activates first.
+- **Leading-bracket messages** (from the T901 review, pre-existing) —
+  terminal-notifier cannot read a `-message` value that starts with `[`,
+  `(`, `{` or a quote (its help text says to escape it `\[`); a subject
+  like `[tool_permissions] …` at the top of the message loses the whole
+  banner while the ledger says `notified=true`. One escape line in
+  `_argv` once the exact rule set is verified against 3.1.0 — not a
+  click concern, so not this map's ticket.
 - **Default `.txt` handler** — TextEdit on this Mac; a user whose default
   is an editor that refuses 0600 files owned by them is not a case we
   know of. Fog until reported.

@@ -180,17 +180,13 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
 
 # ---------------------------------------------------------------- command
 
-def _digest_files(d):
-    return sorted(glob.glob(os.path.join(glob.escape(d), "digest-????-??-??.txt")))
-
-
 def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
                write=False, now=None, out=None):
     out = out or sys.stdout
     if install_agent:
         return install_agent_run(write, out)
     d = ledger.ledger_dir()
-    files = _digest_files(d)
+    files = ledger.digest_files(d)
     if show:
         out.write(Path(files[-1]).read_text() if files else "no digest yet\n")
         return 0

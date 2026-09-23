@@ -25,12 +25,22 @@ def _icon_key(actor):
     return re.sub(r"[^a-z0-9._-]", "_", (actor or "").lower())[:64]
 
 
+def _click_url():
+    """What a click opens: the newest digest as a file:// URI, or None on
+    the first day (wayfinder/notification-click D01–D03). Derived from the
+    directory listing only, never from the banner. Best-effort — monitor.py's
+    read loop must never see an exception from here."""
+    try:
+        from fs_coil.ledger import digest_files, ledger_dir
+        files = digest_files(ledger_dir())
+        return Path(files[-1]).as_uri() if files else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _argv(title, message, group, icon, open_url, root):
-    """terminal-notifier argv. root=(uid, user) when posting from the
-    LaunchDaemon into the console user's session. open_url is what a
-    click opens (wayfinder/notification-click D01); it is stored with the
-    notification and fired in the GUI session, so root needs nothing more.
-    (-sender was removed in terminal-notifier 3.0 — D04.)"""
+    """terminal-notifier argv; root=(uid, user) posts into the console
+    session. -open fires in the GUI session on click; -sender died in 3.0."""
     cmd = []
     if root:
         cmd += ["/bin/launchctl", "asuser", str(root[0]), "/usr/bin/sudo", "-u", root[1]]
@@ -157,6 +167,8 @@ class Notifier:
         group = f"{PLIST_LABEL}.{int(time.time() * 1000)}"
         icon = self._resolve_icon(icon_actor, exe_path, rexe_path) if icon_actor else None
         root = (self._uid, self._user) if os.geteuid() == 0 and self._uid is not None else None
+        if open_url is None:
+            open_url = _click_url()   # every banner, whichever caller posted it
         cmd = _argv(title, message, group, icon, open_url, root)
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
