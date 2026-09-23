@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: T801`
 `blocks: —`
-`status: OPEN — the user's to run (plist edit + launchctl from a plain terminal)`
+`status: ACTIVATED (2026-09-22 21:30) — closes when the next day of plugin churn produces zero light banners`
 
 ## Question
 
@@ -47,6 +47,35 @@ sudo, no `install.sh`.
    - `fs-coil status` shows `degraded none`;
    - map status → CLOSED, fog carried forward, resolution on T801–T802.
 
-## Resolution
+## Resolution (activation, 2026-09-22 21:30)
 
-<!-- filled on completion -->
+- **Two corrections to the steps above, learned live.** (a) `launchctl
+  kickstart -k` restarts the process but does **not** re-read the plist —
+  launchd kept `program = /usr/local/bin/fs-coil` and the Sep 15 pid.
+  The reload is `bootout` + `bootstrap`. (b) `~/.ssh/**` is a read-only
+  deny rule; a write probe there never matches in light mode. The live
+  `deny_write` probe is `touch ~/.config/gh/quiet-light-probe && trash …`
+  (`~/.config/**` is RW and `~/.config/gh` is watched).
+- **The user's first attempt did not land**: pipx venv untouched since
+  09-19 12:11, launchd definition stale, pid 24035 from 09-15. Re-ran from
+  this session: `pipx install --force ~/llmsnitch-cli` (21:30:27, installed
+  `light_watcher.py` byte-identical to main), `bootout` + `bootstrap`
+  (21:30:41 stopping / 21:30:44 starting). `launchctl print` now shows
+  `program = $HOME.local/bin/fs-coil`, pid 24990 under
+  Homebrew Python 3.14; fswatch child respawned. No armed banner
+  (`terminal-notifier -list ALL | grep -c armed` → 0).
+- **Smoke** (ledger `events-2026-09-22.ndjson`, first `fs-coil-light` rows
+  ever): `touch ~/.claude/settings.json` → `agent_self · claude-code ·
+  first_seen · notified=false · record_only=true`, no banner. Probe in
+  `~/.config/gh` → `deny_write · unknown · first_seen · notified=true`, one
+  banner `🐍 unknown · deny_write` naming path, event, rule, action; the
+  removal 3 s later → `window_repeat · notified=false`. Hot state has
+  `agent_self|claude-code` and `deny_write|unknown`; `degraded none`.
+  Criteria 3 and 4 ✓ tonight.
+- **Observation, not a defect**: the trash of the probe logged
+  `event=created` — `kind = flags[0]` and fswatch put `Created` first on a
+  create+remove pair. Cosmetic; fog if it ever misleads a decision.
+- **Pending**: criteria 1–2 need a day of `temp_git_*` churn (bursts land
+  around 11:50 / 12:xx / 15:xx / 19:xx) with zero light banners and the
+  10:00 digest ③ showing `agent_plugin_cache · claude-code`. Close the map
+  then.

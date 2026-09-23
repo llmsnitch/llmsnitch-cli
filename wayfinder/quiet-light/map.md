@@ -1,7 +1,7 @@
 # Quiet Light — Wayfinder Map
 
 `label: wayfinder:map`
-`status: CHARTED (2026-09-22); T801 DONE, T802 activate is the user's — map closes on T802's criteria`
+`status: ACTIVATED (2026-09-22 21:30; T801 done, T802 live on the pipx tree) — closes on the first full day of plugin churn with zero light banners`
 
 ## Destination
 
@@ -129,10 +129,18 @@ write still pages.
   (branch `feature/notification-click-action`, `21f9e8c`) verified the same
   facts — its T902 defers to whichever activation lands first; its T901
   edits `notifier.py` / `notify._deliver` only, so no conflict with T801.
-  Reload verb is `launchctl kickstart -k gui/$(id -u)/com.slav-it.fs-coil`
-  (plist already loaded; bootout/bootstrap only if the label is missing).
-  Plist repointed by this session; `pipx install --force` + kickstart are
-  the user's.
+  Reload verb is `bootout` + `bootstrap` — **not** `kickstart -k`, which
+  restarts the process against launchd's already-loaded (stale)
+  definition and never re-reads the plist (learned live, T802).
+- [T802 — Activate quiet light](tickets/T802-activate-quiet-light.md) —
+  activated 2026-09-22 21:30 from this session after the user's own
+  attempt left the venv and launchd untouched: `pipx install --force`,
+  `bootout`/`bootstrap`; `launchctl print` shows `program =
+  ~/.local/bin/fs-coil`, new pid, no armed banner. First `fs-coil-light`
+  ledger rows ever: `agent_self · claude-code` silent on `first_seen`;
+  `deny_write · unknown` probe in `~/.config/gh` bannered once, its
+  removal was `window_repeat`. Probe path corrected (`~/.ssh/**` is a
+  read-only rule). Closes on tomorrow's churn.
 
 ## Tickets
 
