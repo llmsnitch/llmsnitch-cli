@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T1002`
-`status: CLAIMED (digest-rollup/T1001, 2026-09-26)`
+`status: DONE (2026-09-26)`
 
 ## Question
 
@@ -53,4 +53,51 @@ header and in ③.* No `CLAUDE.md` / `README.md` change (no command changed).
 
 ## Resolution
 
-<!-- filled on completion -->
+Resolved 2026-09-26 on branch `digest-rollup/T1001` (base b25ce61, 4efcac8 an
+ancestor). Built exactly what D01/D02/D05/D06 name, +3 net lines in
+`digest.py` (231 → 234):
+
+- `fs_coil/digest.py` — module level: `_NO_DECISION = {c for c, (_, _, a) in
+  notify.CATEGORIES.items() if a.startswith("none")}` (derived; today that
+  is `agent_self`, `agent_plugin_cache`, `agent_signed_self_read`). ② block:
+  `items` filtered by `k[0] not in _NO_DECISION`; `m = len(new) - len(items)`;
+  header `② new since last digest (N · M digest-only, see ③)` when M > 0,
+  `(N)` otherwise; `nothing new` when N == 0. `new`, `_key`, `_tier`, ③, ④,
+  health untouched — ③ still counts the skipped subjects as new.
+- `tests/test_digest.py` — `test_render_section_two_skips_no_decision_categories`
+  (3 `agent_plugin_cache` + 1 `agent_self` + 1 `deny_write` + 1
+  `depaudit_finding` record_only → header `(2 · 4 digest-only, see ③)`,
+  only the two decision lines listed, ③ `agent_plugin_cache · claude-code  3
+  3/0/0`) and `test_render_section_two_only_no_decision_is_nothing_new`
+  (header `(0 · 3 digest-only, see ③)` then `nothing new`).
+  `test_depaudit_finding_renders_in_section_two` and `test_render_cap_and_full`
+  unchanged and green.
+- `docs/notifier-spec.md` §3 ② — the one sentence from this ticket, verbatim,
+  after "Known repeats are never listed individually."
+
+Done criteria:
+
+1. `python3 tests/all.py` — 210/210 (208 at dispatch + 2), exit 0.
+2. Replay (read-only, in-process: `ledger.iter_rows` + `render()` with
+   `health_report()`; no `notify()`, no `cmd_digest()`, nothing written under
+   the notify dir). Window 2026-09-24 10:00 → 2026-09-25 10:00 reconstructed
+   from the 09-24 digest mtime and the 09-25 digest mtime: 171 rows, 0 skipped,
+   lookback 1248 rows, prior 322 rows — same 171/0 as the shipped header.
+   - before (4efcac8 `render`): header `② new since last digest (67)`; ② body
+     25 lines — `[HIGH] scan_finding` group (1 subject) + `[LESSER]
+     agent_plugin_cache` group with 19 `temp_git_*` lines at the 20-subject
+     cap, then `… 47 more (fs-coil digest --full)`.
+   - after: header `② new since last digest (1 · 66 digest-only, see ③)`;
+     ② body 3 lines — the single `scan_finding` group (`drift_added: …
+     playwright/…/.mcp.json`).
+   - ③ byte-identical to `digest-2026-09-25.txt` ③ before and after
+     (`agent_plugin_cache · claude-code  154  66/0/132` still there); ④
+     byte-identical too.
+3. `wc -l fs_coil/digest.py` = 234 (≤ 236).
+4. Ponytail review over the diff since 4efcac8: one cut (spec sentence
+   carried a redundant header-format parenthetical; -1 line, now verbatim
+   from the ticket). Code and tests judged lean.
+
+Files touched: `fs_coil/digest.py`, `tests/test_digest.py`,
+`docs/notifier-spec.md`, this ticket. No `map.md`, `notify.py`, `CLAUDE.md`,
+or `README.md` change. Cross-ownership requests: none.
