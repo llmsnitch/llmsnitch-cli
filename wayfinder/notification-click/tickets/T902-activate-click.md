@@ -30,7 +30,9 @@ Then close the map.
 
 Evidence so far (banners posted from the repo tree, not the install):
 2026-09-23 — `.txt` target clicked, opened VS Code (led to D01-amended);
-2026-09-26 — browser-twin banner posted, awaiting the click.
+2026-09-26 — browser-twin banner clicked, opened `digest-2026-09-26.html`
+in the default browser (user confirmed). Mechanism proven; what remains
+is the installed-tree click after merge + reinstall.
 
 ## Answer
 

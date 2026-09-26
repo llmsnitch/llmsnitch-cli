@@ -140,7 +140,8 @@ current digest in the default browser.
   reinstall, one real click from the installed tree; shares the
   one-installed-tree step with quiet-light T802. Live so far (repo tree,
   not installed): 2026-09-23 `.txt` click opened VS Code; 2026-09-26
-  browser-twin banner posted for the next click.
+  browser-twin click opened the digest in the browser (user confirmed) —
+  mechanism proven, install pending.
 
 ## Not yet specified
 
