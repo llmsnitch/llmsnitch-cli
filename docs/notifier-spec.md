@@ -673,8 +673,10 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
     7 days before it; ordered critical → high → lesser (low severity /
     `record_only`, i.e. new unattested agents, dep-audit lesser findings),
     grouped by category with that category's `CATEGORIES` decision line
-    once per group. Known repeats are never listed individually. Capped
-    at 20 subjects unless `--full`.
+    once per group. Known repeats are never listed individually. Subjects
+    of categories whose decision line is `none — digest only` are not
+    listed either — their count appears in the ② header (`N · M
+    digest-only, see ③`) and in ③. Capped at 20 subjects unless `--full`.
   ③ **counts** per category × actor_bucket: rows, and new / known /
     resolved subject counts — resolved = seen in the previous window of
     equal length, absent in this one.

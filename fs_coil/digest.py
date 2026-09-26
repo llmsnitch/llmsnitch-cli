@@ -24,6 +24,7 @@ PATROL_MAX_AGE = DEPAUDIT_MAX_AGE = 26 * 3600
 BULLETIN_MAX_AGE_DAYS = 14
 LOOKBACK = 7 * 86400
 _CAP = 20                      # ② subjects on one screen; --full lifts it
+_NO_DECISION = {c for c, (_, _, a) in notify.CATEGORIES.items() if a.startswith("none")}
 _TIERS = ("critical", "high", "lesser")
 _FIX = {"patrol": "launchctl kickstart gui/$(id -u)/com.slav-it.llmsnitch-patrol",
         "dep-audit": "llmsnitch depaudit",
@@ -148,8 +149,10 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
     else:
         L += ["", "open findings: none" + waived]
 
-    L += ["", f"② new since last digest ({len(new)})"]
-    items = sorted((_tier(first[k]), k) for k in new)
+    items = sorted((_tier(first[k]), k) for k in new if k[0] not in _NO_DECISION)
+    m = len(new) - len(items)                 # D01/D02: no-decision categories live in ③
+    L += ["", f"② new since last digest ({len(items)}"
+          + (f" · {m} digest-only, see ③)" if m else ")")]
     last = None
     for i, (t, (cat, act, sub)) in enumerate(items):
         if i >= _CAP and not full:
