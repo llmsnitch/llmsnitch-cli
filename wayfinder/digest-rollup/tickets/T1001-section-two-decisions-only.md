@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: —`
 `blocks: T1002`
-`status: OPEN`
+`status: CLAIMED (digest-rollup/T1001, 2026-09-26)`
 
 ## Question
 
