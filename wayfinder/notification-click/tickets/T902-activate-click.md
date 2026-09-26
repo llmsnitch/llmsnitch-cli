@@ -4,7 +4,7 @@
 `parent: ../map.md`
 `blocked by: T901`
 `blocks: —`
-`status: OPEN`
+`status: ACTIVATED (2026-09-26) — merged `3a02156`, pipx reinstalled, installed-tree banner posted; closes on its click + the 09-27 digest twin`
 
 ## Question
 
@@ -31,8 +31,19 @@ Then close the map.
 Evidence so far (banners posted from the repo tree, not the install):
 2026-09-23 — `.txt` target clicked, opened VS Code (led to D01-amended);
 2026-09-26 — browser-twin banner clicked, opened `digest-2026-09-26.html`
-in the default browser (user confirmed). Mechanism proven; what remains
-is the installed-tree click after merge + reinstall.
+in the default browser (user confirmed). Mechanism proven.
+
+Activation (2026-09-26 13:12 EDT): main had moved (quiet-light closed,
+digest-rollup T1002 — main itself made pipx the one installed tree, so
+step 2 was already done); merged main into the branch (one conflict,
+`tests/all.py` import list), suite 217 green, main fast-forwarded to
+`3a02156`; `pipx install --force ~/llmsnitch-cli`; installed
+`fs_coil/notifier.py` + `digest.py` byte-identical to main; light agent
+`com.slav-it.fs-coil` kickstarted (pid 24990 → 89286, program
+`~/.local/bin/fs-coil`). Banner "click test (T902, installed tree)"
+posted from the pipx venv with `click_path` = today's `.html` twin —
+its click is the closing criterion, together with the 09-27 10:00 digest
+writing both files.
 
 ## Answer
 
