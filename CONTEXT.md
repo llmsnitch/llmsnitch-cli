@@ -28,6 +28,15 @@ Normalized short name for who did it (`claude-code`, `bash`, `unknown`).
 Drives novelty math.
 _Avoid_: process name, agent name
 
+**Territory**:
+The registered path prefixes an agent owns (`~/.claude` and `~/.claude.json`
+for Claude Code, `~/.codex`, …), with an optional cache sub-territory
+(`~/.claude/plugins/cache`). In light mode, where events carry no process,
+the territory a path falls in is the *only* actor signal: inside → that
+agent's `agent_self` / `agent_plugin_cache`; outside every territory →
+`deny_write` by `unknown`.
+_Avoid_: agent dir, home dir, owned path
+
 **Actor raw**:
 The verbatim executable path of the acting process, recorded for forensics
 only.

@@ -687,7 +687,9 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
     7 days before it; ordered critical → high → lesser (low severity /
     `record_only`, i.e. new unattested agents, dep-audit lesser findings),
     grouped by category with that category's `CATEGORIES` decision line
-    once per group. Known repeats are never listed individually. Capped
+    once per group. Known repeats are never listed individually. Subjects
+    of categories whose decision line is `none — digest only` are not
+    listed either — their count appears in the ② header and in ③. Capped
     at 20 subjects unless `--full`.
   ③ **counts** per category × actor_bucket: rows, and new / known /
     resolved subject counts — resolved = seen in the previous window of
@@ -794,6 +796,17 @@ wrappers need no restart (invoked per-run).
   name (`bad@name`) rejected at registry load.
 
 ### T005 — Wire fs-coil light + deep through `notify()`
+
+**Light half executed by T801 (`wayfinder/quiet-light`, 2026-09-22)** with
+these deviations from the text below, kept as history: `agent_registry.py`
+had been deleted as dead code (`53b1ab4`), so attribution is a seven-line
+territory table plus `classify_light` inside `light_watcher.py` — path-only,
+the ceiling this section already names; low-severity categories are passed
+`record_only=True` by the caller (scan.py's precedent) since the engine's
+step 6 does not consult severity; `Notifier._should_emit` stays because
+`monitor.py` still calls it. The **deep half** (monitor.py, `_low_noise` →
+`is_signed_self_read`) is not done — the daemon is not loaded; see that
+map's fog.
 
 - **Touch**: `fs_coil/light_watcher.py` (deny hits → `attribute_actor` +
   `classify_event` + `notify()`; **delete** `load_notify_suppress` and

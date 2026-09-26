@@ -132,6 +132,32 @@ def test_render_cap_and_full():
     assert "more (fs-coil" not in full and "rule_24" in full
 
 
+def test_render_section_two_skips_no_decision_categories():
+    window = [row(T0 - H, "agent_plugin_cache", f"~/.claude/plugins/cache/p{i}",
+                  "claude-code") for i in range(3)]
+    window += [row(T0 - H, "agent_self", "~/.claude/settings.json", "claude-code"),
+               row(T0 - H, "deny_write", "~/.ssh/authorized_keys", "unknown"),
+               row(T0 - H, "depaudit_finding", "vuln: pkg 1.0 (GHSA-1)", "codex",
+                   record_only=True)]
+    text = _render(window)
+    assert "② new since last digest (2 · 4 digest-only, see ③)" in text, text
+    sec2 = text.split("② new")[1].split("③ counts")[0]
+    assert "    unknown · ~/.ssh/authorized_keys" in sec2, sec2
+    assert "    codex · vuln: pkg 1.0 (GHSA-1)" in sec2, sec2
+    for skipped in ("plugins/cache", "settings.json", "agent_plugin_cache", "agent_self"):
+        assert skipped not in sec2, sec2
+    sec3 = text.split("③ counts")[1].split("④")[0]
+    assert "  agent_plugin_cache · claude-code  3  3/0/0" in sec3, sec3
+
+
+def test_render_section_two_only_no_decision_is_nothing_new():
+    window = [row(T0 - H, "agent_plugin_cache", f"~/.claude/plugins/cache/p{i}",
+                  "claude-code") for i in range(3)]
+    text = _render(window)
+    sec2 = text.split("② new")[1].split("③ counts")[0]
+    assert sec2.startswith(" since last digest (0 · 3 digest-only, see ③)\n  nothing new\n"), sec2
+
+
 def test_render_empty_and_unhealthy():
     text = _render([], problems=["patrol missed (never)"], patrol_ts=None)
     assert "  nothing new" in text and "  (no rows)" in text
