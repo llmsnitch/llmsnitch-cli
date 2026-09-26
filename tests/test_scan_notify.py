@@ -260,5 +260,20 @@ def test_patrol_runs_depaudit_worst_verdict_wins():
     _with_tmp(body)
 
 
+def test_patrol_refresh_failure_still_audits():
+    """with_tmp points LLMSNITCH_BULLETIN_URL at a dead file:// — the
+    patrol's refresh warns and dep-audit still runs (T803)."""
+    def body(t, delivered, errors):
+        clean = t / "clean" / ".claude"
+        clean.mkdir(parents=True)
+        (clean / "settings.json").write_text('{"model": "opus"}')
+        buf = io.StringIO()
+        assert scan.cmd_scan([str(t / "clean"), "--patrol"], buf) == 2
+        text = buf.getvalue()
+        assert "[WARN] bulletin refresh failed: fetch failed" in text, text
+        assert "bulletin missing" in text, text        # the audit ran
+    _with_tmp(body)
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

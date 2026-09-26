@@ -850,7 +850,9 @@ def cmd_scan(argv, out):
         # The daily patrol carries both surfaces in one process (T508).
         # Worst verdict wins; a breach (1) in either surface is never
         # masked by an operational failure (2) in the other.
-        from . import depaudit
+        from . import bulletin, depaudit
+        if bulletin.needs_refresh():
+            bulletin.refresh(out)   # failure warns; the audit runs on the old cache
         dep_rc = depaudit.cmd_depaudit(["--format", a.fmt], out)
         rc = 1 if 1 in (rc, dep_rc) else max(rc, dep_rc)
     return rc

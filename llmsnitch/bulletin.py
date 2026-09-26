@@ -1,6 +1,8 @@
-"""Bulletin cache reader — the offline half of docs/bulletin-spec.md.
+"""Bulletin cache reader + fetch — docs/bulletin-spec.md "Fetch, verify, cache".
 
-Re-verifies the cached gz against its .sha256 sidecar (integrity over the
+The fetch is a curl subprocess (ADR 0001: no network code in the package);
+refresh() lands the pair in temps beside the cache, verifies them with the
+same load() the audit uses, and swaps atomically. Re-verifies the cached gz against its .sha256 sidecar (integrity over the
 raw bytes), gates on schema_version {1}, and stamps payload age from
 meta.issued_at. The cache file is hostile input: load() never raises —
 every failure is (None, "short reason") — and index() skips malformed
@@ -12,7 +14,9 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import re
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +25,15 @@ from . import store
 # Decompression bound: the spec's guidance is <= 10 MB gz per ecosystem; a
 # hostile cache file must not be able to balloon memory (gzip packs ~1000:1).
 _MAX_DECOMP = 200_000_000
+
+# Rolling release published by the provider (developed independently at
+# ~/Repos/llmsnitch-bulletin, docs/bulletin-spec.md is the shared contract);
+# LLMSNITCH_BULLETIN_URL overrides — file:// URLs work, that is the test seam.
+BULLETIN_URL = ("https://github.com/llmsnitch/bulletin/releases/download/"
+                "bulletin/pypi.json.gz")
+# ponytail: a constant, not a config key — the digest already says
+# "bulletin stale" at 14 days; make this configurable when someone asks.
+REFRESH_DAYS = 7
 
 
 def default_path():
@@ -56,6 +69,56 @@ def load(path=None):
     if sv is True or sv != 1:   # bool guard: JSON true == 1 in Python
         return None, f"unsupported schema_version {sv}"
     return doc, None
+
+
+def needs_refresh():
+    """Cache missing, unloadable, or payload older than REFRESH_DAYS."""
+    doc, _ = load()
+    if doc is None:
+        return True
+    age = age_days(doc["meta"])
+    return age is None or age >= REFRESH_DAYS
+
+
+def _curl(url, dest):
+    try:
+        rc = subprocess.run(
+            ["curl", "-fsSL", "--retry", "3", "--max-time", "120",
+             "-o", str(dest), url], capture_output=True).returncode
+    except OSError:          # no curl on PATH
+        return False
+    store._chmod_private(dest)   # curl opens the file itself
+    return rc == 0
+
+
+def refresh(out):
+    """Fetch bulletin + sidecar to temps, verify with load(), swap
+    atomically. 0 ok / 2 failed (one [WARN] line); never raises — the
+    caller keeps auditing on the old cache."""
+    url = os.environ.get("LLMSNITCH_BULLETIN_URL", BULLETIN_URL)
+    p = default_path()
+    tmp = Path(str(p) + ".tmp")
+    tmp_sc = Path(str(tmp) + ".sha256")   # load(tmp) finds it unchanged
+    try:
+        store._mkdir_private(p.parent)
+        if not (_curl(url, tmp) and _curl(url + ".sha256", tmp_sc)):
+            reason = "fetch failed"
+        else:
+            doc, reason = load(tmp)
+        if reason is None:
+            os.replace(tmp_sc, Path(str(p) + ".sha256"))
+            os.replace(tmp, p)
+            return 0
+    except OSError as e:
+        reason = type(e).__name__
+    finally:
+        for f in (tmp, tmp_sc):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    out.write(f"[WARN] bulletin refresh failed: {reason}\n")
+    return 2
 
 
 def age_days(meta):

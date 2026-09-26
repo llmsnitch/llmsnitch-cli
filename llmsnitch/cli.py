@@ -8,6 +8,7 @@
                               --waive RULE_ID ARTIFACT --reason TEXT adds a waiver
   llmsnitch depaudit          intakes x bulletin dep audit (exit 0/1/2);
                               --waive ID PACKAGE --reason TEXT adds a waiver
+  llmsnitch bulletin refresh  fetch the bulletin now (the patrol does this weekly)
   llmsnitch patrol [--write]  print/install the daily scan LaunchAgent
   llmsnitch ingest            sweep harness ledgers (also runs lazily
                               before list/show/check)
@@ -121,6 +122,9 @@ def main(argv=None):
     if cmd == "depaudit":
         from . import depaudit
         return depaudit.cmd_depaudit(argv[1:], out)
+    if cmd == "bulletin" and argv[1:] == ["refresh"]:
+        from . import bulletin
+        return bulletin.refresh(out)
     if cmd == "patrol":
         from . import patrol
         return patrol.run("--write" in argv, out)

@@ -8,11 +8,12 @@ Run: python3 tests/test_depaudit_bulletin.py
 
 import gzip
 import hashlib
+import io
 import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +29,7 @@ def _with_tmp_store(fn):
         try:
             fn(Path(t))
         finally:
+            os.environ.pop("LLMSNITCH_BULLETIN_URL", None)
             if old is None:
                 os.environ.pop("LLMSNITCH_DIR", None)
             else:
@@ -51,6 +53,24 @@ def _write(t, obj=None, raw=None, sidecar=True, sidecar_text=None):
             sidecar_text = hashlib.sha256(raw).hexdigest()
         (d / "pypi.json.gz.sha256").write_text(sidecar_text)
     return raw
+
+
+def _remote(t, obj, sidecar_text=None, name="pypi.json.gz"):
+    """A provider stand-in: bulletin + sidecar under t/remote, and point
+    LLMSNITCH_BULLETIN_URL (the seam) at it as a file:// URL."""
+    d = t / "remote"
+    d.mkdir(exist_ok=True)
+    raw = gzip.compress(json.dumps(obj).encode())
+    (d / name).write_bytes(raw)
+    (d / (name + ".sha256")).write_text(
+        sidecar_text if sidecar_text is not None
+        else hashlib.sha256(raw).hexdigest() + "\n")
+    os.environ["LLMSNITCH_BULLETIN_URL"] = f"file://{d / name}"
+    return raw
+
+
+def _no_temps(t):
+    return not list((t / "bulletins").glob("*.tmp*"))
 
 
 _GOOD = {"id": "CVE-2019-10906", "aliases": ["GHSA-462w-v97r-4m45"],
@@ -150,6 +170,82 @@ def test_load_explicit_path():
         Path(str(p) + ".sha256").write_text(hashlib.sha256(raw).hexdigest())
         b, note = bulletin.load(p)
         assert note is None and b["entries"][0]["id"] == "MAL-2022-7421"
+    _with_tmp_store(body)
+
+
+def test_refresh_happy_path_swaps_cache():
+    def body(t):
+        _write(t, _doc([_GOOD], issued="2026-01-01T00:00:00Z"))   # old cache
+        _remote(t, _doc([_MAL], issued="2026-09-19T14:17:00Z"))
+        out = io.StringIO()
+        assert bulletin.refresh(out) == 0, out.getvalue()
+        assert out.getvalue() == ""
+        b, note = bulletin.load()
+        assert note is None and b["entries"][0]["id"] == "MAL-2022-7421"
+        assert _no_temps(t)
+        assert oct(bulletin.default_path().stat().st_mode & 0o777) == "0o600"
+    _with_tmp_store(body)
+
+
+def test_refresh_into_empty_store_creates_dir():
+    def body(t):
+        _remote(t, _doc([_GOOD]))
+        assert bulletin.refresh(io.StringIO()) == 0
+        assert bulletin.load()[1] is None
+        assert oct((t / "bulletins").stat().st_mode & 0o777) == "0o700"
+    _with_tmp_store(body)
+
+
+def test_refresh_sidecar_mismatch_keeps_old_cache():
+    def body(t):
+        old = _write(t, _doc([_GOOD]))
+        _remote(t, _doc([_MAL]), sidecar_text="0" * 64)
+        out = io.StringIO()
+        assert bulletin.refresh(out) == 2
+        assert "[WARN] bulletin refresh failed: hash mismatch" in out.getvalue()
+        assert bulletin.default_path().read_bytes() == old
+        assert _no_temps(t)
+    _with_tmp_store(body)
+
+
+def test_refresh_fetch_failure_is_2():
+    def body(t):
+        old = _write(t, _doc([_GOOD]))
+        os.environ["LLMSNITCH_BULLETIN_URL"] = f"file://{t}/nope.gz"
+        out = io.StringIO()
+        assert bulletin.refresh(out) == 2
+        assert "[WARN] bulletin refresh failed: fetch failed" in out.getvalue()
+        assert bulletin.default_path().read_bytes() == old
+        assert _no_temps(t)
+    _with_tmp_store(body)
+
+
+def test_refresh_rejects_schema_2_before_swap():
+    def body(t):
+        old = _write(t, _doc([_GOOD]))
+        _remote(t, _doc([_MAL], schema=2))
+        out = io.StringIO()
+        assert bulletin.refresh(out) == 2
+        assert "unsupported schema_version 2" in out.getvalue()
+        assert bulletin.default_path().read_bytes() == old
+        assert _no_temps(t)
+    _with_tmp_store(body)
+
+
+def test_needs_refresh():
+    def body(t):
+        assert bulletin.needs_refresh()                       # missing
+        _write(t, _doc(), sidecar_text="0" * 64)
+        assert bulletin.needs_refresh()                       # corrupt
+        fresh = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _write(t, _doc(issued=fresh))
+        assert not bulletin.needs_refresh()                   # fresh
+        old = (datetime.now(timezone.utc) - timedelta(days=8)
+               ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _write(t, _doc(issued=old))
+        assert bulletin.needs_refresh()                       # 8 days
+        _write(t, _doc(issued="garbage"))
+        assert bulletin.needs_refresh()                       # unstampable
     _with_tmp_store(body)
 
 

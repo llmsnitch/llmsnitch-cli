@@ -445,7 +445,7 @@ def cmd_depaudit(argv, out):
         return 2
     _stamp_state(meta, findings, note)
     if note:
-        out.write(f"[ERROR] {note} — run the weekly refresh (T508) or check "
+        out.write(f"[ERROR] {note} — run: llmsnitch bulletin refresh, or check "
                   f"{bulletin.default_path()}\n")
         return 2
     meta["notify_routed"] = _route_to_notifier(findings)

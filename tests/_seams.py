@@ -21,7 +21,9 @@ def with_tmp(fn, config="", store=False):
         (t / "config.ini").write_text(config or "[notify]\ncold_start = 0\n")
         env = {"LLMSNITCH_NOTIFY_DIR": str(t / "notify"),
                "LLMSNITCH_HOT_STATE": str(t / "cache" / "notify-state.json"),
-               "LLMSNITCH_CONFIG": str(t / "config.ini")}
+               "LLMSNITCH_CONFIG": str(t / "config.ini"),
+               # patrol tests must never curl the real provider
+               "LLMSNITCH_BULLETIN_URL": f"file://{t}/no-bulletin.gz"}
         if store:
             env["LLMSNITCH_DIR"] = str(t / "store")
         old_env = {k: os.environ.get(k) for k in env}
