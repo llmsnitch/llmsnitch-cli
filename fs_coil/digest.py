@@ -8,6 +8,7 @@ fs_coil never imports llmsnitch: producers stamp state files under
 """
 
 import glob
+import html
 import json
 import os
 import sys
@@ -180,6 +181,14 @@ def render(window, lookback, prior, health, *, start_ts, end_ts,
 
 # ---------------------------------------------------------------- command
 
+def _write_private(path, data):
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600),
+                   "w") as f:
+        f.write(data)
+    os.chmod(path, 0o600)
+    notify._chown_user(path)
+
+
 def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
                write=False, now=None, out=None):
     out = out or sys.stdout
@@ -205,11 +214,12 @@ def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
 
     notify._mkdir_owned(d, 0o700)
     path = os.path.join(d, f"digest-{today}.txt")
-    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600),
-                   "w") as f:
-        f.write(text)
-    os.chmod(path, 0o600)
-    notify._chown_user(path)
+    _write_private(path, text)
+    # Browser twin — what a banner click opens (wayfinder/notification-click
+    # D01): the .html default handler is a browser on every OS, never an IDE.
+    _write_private(path[:-4] + ".html",
+                   f"<!doctype html><meta charset=utf-8><title>llmsnitch digest "
+                   f"{today}</title><pre>{html.escape(text)}</pre>\n")
     out.write(f"digest written: {path}\n")
 
     if health["problems"] and notify._bool(

@@ -1,22 +1,23 @@
 # Notification Click — Wayfinder Map
 
 `label: wayfinder:map`
-`status: BUILT (2026-09-22) — T901 done; T902 activate is the user's; closes on T902's criteria`
+`status: BUILT (2026-09-22; D01 viewer amended 2026-09-26) — T901 done; T902 activate is the user's; closes on T902's criteria`
 
 ## Destination
 
-**Clicking a llmsnitch banner opens the newest daily digest.** The digest
-file is the one review artifact this project already maintains for its
-users — health first, then what is new, then counts — and a text file
-opened by the OS default handler is the destination that works for
-anyone, terminal habit or not. macOS: `terminal-notifier -open
-file:///…/notify/digest-YYYY-MM-DD.txt`. Windows (future outlet): a toast
+**Clicking a llmsnitch banner opens the newest daily digest in the
+browser.** The digest is the one review artifact this project already
+maintains for its users — health first, then what is new, then counts —
+and its browser twin (`digest-YYYY-MM-DD.html`, the same text escaped
+inside `<pre>`) opened by the OS default handler is the destination that
+works for anyone: the `.html` handler is a browser on every OS, never an
+IDE, and nothing is pinned or registered. macOS: `terminal-notifier -open
+file:///…/notify/digest-YYYY-MM-DD.html`. Windows (future outlet): a toast
 `launch="file:///…"` with `activationType="protocol"` opens the same file
-in Notepad — the artifact needs no change when that outlet exists. The map
-closes when [T902](tickets/T902-activate-click.md)'s done criteria hold: a
-real banner on this Mac, clicked, opens the current digest in the default
-text editor, and the system log shows terminal-notifier performing the
-open.
+— the artifact needs no change when that outlet exists. The map closes
+when [T902](tickets/T902-activate-click.md)'s done criteria hold: a real
+banner on this Mac, posted by the installed tree, clicked, opens the
+current digest in the default browser.
 
 ## Notes
 
@@ -82,7 +83,7 @@ open.
 | # | Click does | Mac mechanism | Windows analogue | Verdict |
 |---|---|---|---|---|
 | A | Bring a terminal to the front | `-activate app.supabit.supacode` (or Ghostty / Terminal) | protocol `wt:` (none registered) | Shows nothing; barely better than today. |
-| **B** | **Open the newest digest file** | **`-open file://…/notify/digest-YYYY-MM-DD.txt`** | `launch="file:///…"` | **Chosen (user, 2026-09-22): most sound for the project's users.** Zero new artifact, default text editor on both OSes, the digest is already the review home. Limitation: the digest is the 10:00 trailing view, so the clicked banner's own finding appears in tomorrow's ② — fog item below. |
+| **B** | **Open the newest digest file** | **`-open file://…/notify/digest-YYYY-MM-DD.html`** | `launch="file:///…"` | **Chosen (user, 2026-09-22): most sound for the project's users.** The digest is already the review home. Viewer settled in round 2 (below): the `.txt` default handler opened VS Code on the first live click, so the click target is a browser twin. Limitation: the digest is the 10:00 trailing view, so the clicked banner's own finding appears in tomorrow's ② — fog item below. |
 | C | Open a terminal running the category's recall command | `-open file://…/click/<category>.command` (static scripts) | `launch="file:///…/<category>.cmd"` | Runner-up. Assumes a terminal user; adds generated executables. Returns only via the freshness fog item. |
 | D | Same as C in the user's terminal of choice | `-execute '/usr/bin/open -na Ghostty …'` + config key | n/a | Mac-only, new config axis. Rejected. |
 | E | Open a Supacode tab running the command | `supacode://worktree/<id>/tab/new?input=` | n/a | Needs a worktree id the daemon lacks; confirmation prompts; app coupling. Rejected. |
@@ -118,9 +119,28 @@ open.
   Two-axis review 7 findings → 6 fixed, 1 deferred (below). +5 tests,
   suite 209. **D02 amended**: resolution happens in `Notifier`, not
   `_deliver`.
+- Grilling round 2 (2026-09-23/26, after the first live click opened VS
+  Code): viewer options laid out with their Windows twin — OS default
+  `.txt` handler (an IDE for most developers on both OSes), pinned
+  TextEdit (`-execute open -a`; Windows would need an HKCU `llmsnitch:`
+  scheme to reach Notepad), **browser twin**, terminal script, notify
+  folder in Finder/Explorer, `-activate`, custom scheme, Quick Look.
+  **D01 amended (user)**: the click target is `digest-YYYY-MM-DD.html`,
+  written by every digest run beside the `.txt` (`html.escape`d in
+  `<pre>`, 0600, chown'd, pruned together) — the only option where the
+  click is a plain `file://` URI on both platforms and the viewer is never
+  an IDE. **D07 message escape**: a `-message` whose first character is
+  one of `[({"-<` is prefixed `\` in `_argv` — verified against 3.1.0
+  (each rejects with exit 2 unescaped, `-title` is unaffected, the
+  backslash is stripped from the shown text). **D08 T902 criterion**: the
+  "system log records the open" criterion is dropped — a real click
+  logged nothing under `process == "terminal-notifier"`; the observed
+  open is the evidence. Suite 209 → 211.
 - [T902 — Activate](tickets/T902-activate-click.md) — user: merge,
-  reinstall, one real click; shares the one-installed-tree step with
-  quiet-light T802.
+  reinstall, one real click from the installed tree; shares the
+  one-installed-tree step with quiet-light T802. Live so far (repo tree,
+  not installed): 2026-09-23 `.txt` click opened VS Code; 2026-09-26
+  browser-twin banner posted for the next click.
 
 ## Not yet specified
 
@@ -134,16 +154,6 @@ open.
   `/usr/local` tree; repoint at the pipx shim or re-sync is a T902 step
   here and a T802 step on quiet-light. The *policy* is shared fog; decide
   once, in whichever activates first.
-- **Leading-bracket messages** (from the T901 review, pre-existing) —
-  terminal-notifier cannot read a `-message` value that starts with `[`,
-  `(`, `{` or a quote (its help text says to escape it `\[`); a subject
-  like `[tool_permissions] …` at the top of the message loses the whole
-  banner while the ledger says `notified=true`. One escape line in
-  `_argv` once the exact rule set is verified against 3.1.0 — not a
-  click concern, so not this map's ticket.
-- **Default `.txt` handler** — TextEdit on this Mac; a user whose default
-  is an editor that refuses 0600 files owned by them is not a case we
-  know of. Fog until reported.
 - **Windows outlet proper** — `notifier_win.py`, AUMID choice,
   `hook.handle` without `fcntl`, digest path on Windows. A fresh map when
   llmsnitch runs on Windows at all; this map's only Windows deliverable

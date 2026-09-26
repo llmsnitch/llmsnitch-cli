@@ -604,12 +604,17 @@ from fields when the caller passes no `title`/`message`):
   `-group` suffix per banner (macOS otherwise collapses repeats),
   `launchctl asuser <uid> sudo -u <user>` when running as root, icon
   resolution unchanged. Delete only `_should_emit`/`_last`/`_cooldown`.
-- **Click** (`wayfinder/notification-click`, 2026-09-22): every banner
-  carries `-open file://<newest digest-YYYY-MM-DD.txt>` — a click opens
-  the digest in the default text editor; no digest yet (first day) → no
-  click action. The URL derives from the directory listing only, never
-  from the row. `-sender` was removed in terminal-notifier 3.0 and is no
-  longer passed.
+- **Click** (`wayfinder/notification-click`, 2026-09-22/26): every banner
+  carries `-open file://<newest digest-YYYY-MM-DD.html>` — the digest's
+  browser twin (§3), so a click opens the digest in the default browser on
+  any OS (the `.txt` default handler is an IDE for most developers; a
+  Windows toast reaches the same file with `launch="file:///…"`). No
+  digest yet (first day) → no click action. The URL derives from the
+  directory listing only, never from the row, and is `Path.as_uri()`
+  escaped. A `-message` whose first character is one of `[({"-<` is
+  prefixed with `\` — terminal-notifier's `NSUserDefaults` parsing
+  otherwise rejects the value and the banner is lost. `-sender` was
+  removed in terminal-notifier 3.0 and is no longer passed.
 
 ### 2. On-demand CLI recall — `fs-coil noise`
 
@@ -653,7 +658,10 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
 - **File**: always writes `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt`
   (0600, chown'd to the console user when euid is 0 — the same
   `_mkdir_owned`/`_chown_user` discipline as the ledger). Unconditional
-  (D18); no config key disables it. `--show` prints the newest digest
+  (D18); no config key disables it. Alongside it, a **browser twin**
+  `digest-YYYY-MM-DD.html` — the same text `html.escape`d inside `<pre>`,
+  same permissions — is the banner click target (outlet 1;
+  `wayfinder/notification-click`). `prune --target notify` covers both. `--show` prints the newest digest
   file; `--full` lifts the one-screen cap on section ②; `--prune` runs
   `prune --target notify` after writing (one plist command does both).
 - **Content, in order** (every line: Decision / Actor / Novelty):

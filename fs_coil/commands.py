@@ -172,7 +172,7 @@ def cmd_prune(days=None, target=None):
     elif target == "notify":
         from fs_coil import ledger
         spec = (ledger.ledger_dir(),
-                r"^(?:events|digest)-(\d{4}-\d{2}-\d{2})\.(?:ndjson|txt)$", 45, "notify")
+                r"^(?:events|digest)-(\d{4}-\d{2}-\d{2})\.(?:ndjson|txt|html)$", 45, "notify")
     else:
         err(f"unknown prune target: {target!r} (use 'logs' or 'notify')")
         sys.exit(1)

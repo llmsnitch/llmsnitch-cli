@@ -9,6 +9,7 @@ import io
 import json
 import os
 import sys
+from html import unescape as html_unescape
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -159,6 +160,24 @@ def test_cmd_digest_healthy_writes_0600_file_no_banner():
         assert delivered == [] and not errors
         code, shown = _run(show=True)
         assert shown == text
+    _tmp(body)
+
+
+def test_cmd_digest_writes_escaped_browser_twin():
+    def body(t, delivered, errors):
+        _healthy(t)
+        seed_ledger(t, [row(T0 - H, "scan_finding", "<script>alert(1)</script> ~/a & b")])
+        _run()
+        stamp = f"{digest.datetime.fromtimestamp(T0):%Y-%m-%d}"
+        twin = t / "notify" / f"digest-{stamp}.html"
+        assert twin.exists() and oct(twin.stat().st_mode)[-3:] == "600"
+        page = twin.read_text()
+        assert page.startswith("<!doctype html>") and "<pre>" in page
+        assert "<script>" not in page and "&lt;script&gt;alert(1)&lt;/script&gt; ~/a &amp; b" in page
+        assert html_unescape(page.split("<pre>", 1)[1].rsplit("</pre>", 1)[0]) == \
+            (t / "notify" / f"digest-{stamp}.txt").read_text()
+        code, shown = _run(show=True)                      # --show stays the text digest
+        assert "<pre>" not in shown
     _tmp(body)
 
 

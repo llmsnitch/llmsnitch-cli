@@ -86,6 +86,14 @@ gone from `fs_coil/`. Spec §"Delivery outlets" 1 amended. Live check on
 this Mac: `_click_url()` → today's `digest-2026-09-22.txt`; one test
 banner posted with that URL for the T902 click.
 
-Deferred, recorded on the map: leading `[`/`(`/quote in a `-message`
-value makes terminal-notifier fail to read it (its own help text); a
-pre-existing banner-loss path, not a click concern.
+**Addendum (2026-09-23/26, map round 2).** The first live click opened
+VS Code — the OS default `.txt` handler. Per D01-amended the click target
+is now the digest's browser twin: `cmd_digest` writes
+`digest-YYYY-MM-DD.html` (`html.escape`d text in `<pre>`, via a shared
+`_write_private`) beside the `.txt`; `ledger.digest_files(d, ext)` lists
+either shape; `prune --target notify` covers `.html`; `_click_path()`
+returns the newest twin and `_argv` passes it as `Path.as_uri()` under
+`-open`. The message-escape finding is fixed rather than deferred:
+`_argv` prefixes `\` when `message[0] in '[({"-<'`, the set verified
+against 3.1.0 with scheduled-and-removed probes. +1 digest test, +1
+argv test; suite 211, exit 0.

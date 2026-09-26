@@ -25,30 +25,36 @@ def _icon_key(actor):
     return re.sub(r"[^a-z0-9._-]", "_", (actor or "").lower())[:64]
 
 
-def _click_url():
-    """What a click opens: the newest digest as a file:// URI, or None on
-    the first day (wayfinder/notification-click D01–D03). Derived from the
+_PLIST_LEAD = '[({"-<'   # NSUserDefaults misreads a -message starting with these
+
+
+def _click_path():
+    """What a click opens: the newest digest's browser twin (.html), or None
+    on the first day (wayfinder/notification-click D01–D03). Derived from the
     directory listing only, never from the banner. Best-effort — monitor.py's
     read loop must never see an exception from here."""
     try:
         from fs_coil.ledger import digest_files, ledger_dir
-        files = digest_files(ledger_dir())
-        return Path(files[-1]).as_uri() if files else None
+        files = digest_files(ledger_dir(), "html")
+        return files[-1] if files else None
     except Exception:  # noqa: BLE001
         return None
 
 
-def _argv(title, message, group, icon, open_url, root):
+def _argv(title, message, group, icon, click_path, root):
     """terminal-notifier argv; root=(uid, user) posts into the console
-    session. -open fires in the GUI session on click; -sender died in 3.0."""
+    session. -open fires in the GUI session on click (a file:// URI, so the
+    default browser opens it on any OS); -sender died in 3.0."""
+    if message[:1] in _PLIST_LEAD:
+        message = "\\" + message   # 3.1.0 strips the backslash from the text
     cmd = []
     if root:
         cmd += ["/bin/launchctl", "asuser", str(root[0]), "/usr/bin/sudo", "-u", root[1]]
     cmd += [TERMINAL_NOTIFIER, "-title", title, "-message", message, "-group", group]
     if icon:
         cmd += ["-contentImage", icon]
-    if open_url:
-        cmd += ["-open", open_url]
+    if click_path:
+        cmd += ["-open", Path(click_path).as_uri()]
     return cmd
 
 
@@ -151,7 +157,7 @@ class Notifier:
         return True
 
     def notify(self, title, message, key,
-               icon_actor=None, exe_path=None, rexe_path=None, open_url=None):
+               icon_actor=None, exe_path=None, rexe_path=None, click_path=None):
         if not self._should_emit(key):
             return
         if not os.path.exists(TERMINAL_NOTIFIER):
@@ -167,9 +173,9 @@ class Notifier:
         group = f"{PLIST_LABEL}.{int(time.time() * 1000)}"
         icon = self._resolve_icon(icon_actor, exe_path, rexe_path) if icon_actor else None
         root = (self._uid, self._user) if os.geteuid() == 0 and self._uid is not None else None
-        if open_url is None:
-            open_url = _click_url()   # every banner, whichever caller posted it
-        cmd = _argv(title, message, group, icon, open_url, root)
+        if click_path is None:
+            click_path = _click_path()   # every banner, whichever caller posted it
+        cmd = _argv(title, message, group, icon, click_path, root)
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:

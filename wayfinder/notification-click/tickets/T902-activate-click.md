@@ -22,11 +22,15 @@ The user's ticket (merge and reinstall are theirs, not the orchestrator's).
 3. Wait for a real banner (the next `scan_finding` page, or the digest's
    `watcher_health` if a health condition holds), click it.
 
-Done when: the current `digest-YYYY-MM-DD.txt` opens in the default text
-editor; `log show --predicate 'process == "terminal-notifier"' --last
-1h` records the open; `terminal-notifier -list ALL` shows no banner
-carrying the old `com.apple.Terminal` sender behaviour (i.e. every
-post-reinstall banner is clickable). Then close the map.
+Done when: a banner posted by the **installed** tree, clicked, opens the
+current `digest-YYYY-MM-DD.html` in the default browser, and the next
+10:00 digest run writes both the `.txt` and its `.html` twin. (The
+system-log criterion is dropped — D08: a real click logged nothing.)
+Then close the map.
+
+Evidence so far (banners posted from the repo tree, not the install):
+2026-09-23 — `.txt` target clicked, opened VS Code (led to D01-amended);
+2026-09-26 — browser-twin banner posted, awaiting the click.
 
 ## Answer
 
