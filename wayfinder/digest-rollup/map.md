@@ -1,7 +1,7 @@
 # Digest Rollup — Wayfinder Map
 
 `label: wayfinder:map`
-`status: CHARTED (2026-09-26); T1001 build is the frontier, T1002 activate follows`
+`status: T1001 DONE (2026-09-26); T1002 activate in progress`
 
 ## Destination
 
@@ -92,6 +92,17 @@ them, and whose ③ still counts them.
   not touched**: the μ+2σ anomaly section (spec, deferred) remains the
   designed home for "volume" questions; this map is about ② readability
   only.
+
+- [T1001 — ② lists decisions only](tickets/T1001-section-two-decisions-only.md)
+  — done 2026-09-26 by one task agent per `dispatch.md` (branch
+  `digest-rollup/T1001`, `7488fc4`, four commits on base `b25ce61`).
+  `_NO_DECISION` derived from `notify.CATEGORIES`; ② filters at `items`,
+  header `(N · M digest-only, see ③)`; +3 net lines (`digest.py` 234), 2
+  tests (suite 208 → 210), spec §3 ② one sentence. Read-only replay of the
+  09-24 → 09-25 window: ② 25 lines → 3, header `(1 · 66 digest-only, see
+  ③)`, ③ and ④ byte-identical to the shipped digest. Orchestrator
+  re-verified log, base, diff, and gate in the agent worktree before the
+  ff-merge; inline review (table row 1) found nothing to change.
 
 ## Tickets
 
