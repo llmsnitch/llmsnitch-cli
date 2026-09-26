@@ -1,7 +1,7 @@
 # Quiet Light — Wayfinder Map
 
 `label: wayfinder:map`
-`status: ACTIVATED (2026-09-22 21:30; T801 done, T802 live on the pipx tree) — closes on the first full day of plugin churn with zero light banners`
+`status: CLOSED (2026-09-26) — 654 light hits over three full days, one real banner; fog carried forward below. History — never rewrite.`
 
 ## Destination
 
@@ -141,6 +141,11 @@ write still pages.
   `deny_write · unknown` probe in `~/.config/gh` bannered once, its
   removal was `window_repeat`. Probe path corrected (`~/.ssh/**` is a
   read-only rule). Closes on tomorrow's churn.
+- **Close (2026-09-26)**: three full days on the pipx tree, same pid, no
+  errors. 654 light hits → 604 `agent_plugin_cache` + 46 `agent_self`,
+  all ledger-only; **one** real banner (`deny_write · unknown ·
+  ~/.zprofile`, 09-23 14:05). Digest ③ carries the plugin-cache count
+  daily; ① healthy. Destination reached; map closed.
 
 ## Tickets
 
@@ -153,9 +158,13 @@ write still pages.
   a new subject key, so the first digest after activation will list up to
   the 20-row cap of lesser "new since last digest" lines that are all one
   event class. The digest-outlet handoff already holds this fog
-  ("known-churn rule or path-class rollup"); sharper once one real digest
-  has been read with light rows in it. Candidate answer: subject for
-  `agent_plugin_cache` collapses `temp_git_*` to `temp_git_*`.
+  ("known-churn rule or path-class rollup"). **Measured at close**: four
+  digests (09-23 → 09-26) each spend 22–23 of ~50 lines on one
+  `temp_git_<ts>_<rand>/.git/{config,hooks/*.sample}` clone — the cap
+  holds but ② is unreadable for lesser rows. Candidate answer: subject for
+  `agent_plugin_cache` collapses `temp_git_*` to `temp_git_*` (one line
+  per class), or ② skips `record_only` rows whose category is
+  `agent_plugin_cache` and leaves them to ③/④. Next map's first ticket.
 - **Deep-mode wiring** — spec T005's deep half: `monitor.py` deny hits →
   `notify()` with `pinfo`, `keychain_access` direct, `_low_noise` →
   `is_signed_self_read` predicate (OS signing-id prefix only, never a

@@ -4,7 +4,28 @@
 `parent: ../map.md`
 `blocked by: T801`
 `blocks: —`
-`status: ACTIVATED (2026-09-22 21:30) — closes when the next day of plugin churn produces zero light banners`
+`status: DONE (2026-09-26) — three full days of churn, zero plugin-cache banners`
+
+## Close (2026-09-26 12:45)
+
+- **Agent**: still pid 24990 on `~/.local/bin/fs-coil` since 09-22 21:30;
+  no restart, no `EVENT-ERROR` / `NOTIFIER-ERROR`, `degraded none`.
+- **Light hits since activation** (log `category=` lines / banners):
+  09-22 78/1 (the probe), 09-23 245/1, 09-24 214/0, 09-25 117/0 — **654
+  hits, 1 real banner**: `deny_write · unknown · ~/.zprofile` at 09-23
+  14:05, the actionable class (something rewrote the user's zprofile;
+  light cannot say what — deep mode's job). Ledger agrees: 604
+  `agent_plugin_cache · claude-code`, 46 `agent_self · claude-code`, all
+  `notified=false`; the two `deny_write` rows paged once each.
+- **Digest**: ③ shows `agent_plugin_cache · claude-code` daily (75 / 242 /
+  214 / 73); ① `all watchers healthy` 09-23 → 09-25 (09-26 banners only
+  the stale bulletin, unrelated). ② lists the 20-row cap of `temp_git_*`
+  lesser subjects every morning (22–23 lines of 49–52) — the map's first
+  fog item, now measured.
+- **Notification Center**: 81 old `fs-coil (light) · W` banners cleared
+  09-22 21:44 per group id; since then 1 light banner (the zprofile
+  `deny_write`), still posted, plus scan banners.
+- Criteria 1–5 ✓. Map closed.
 
 ## Question
 
