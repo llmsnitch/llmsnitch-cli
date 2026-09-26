@@ -1,7 +1,7 @@
 # Notification Click — Wayfinder Map
 
 `label: wayfinder:map`
-`status: ACTIVATED (2026-09-26) — T901 done, T902 merged to main `3a02156` + pipx reinstalled + light agent restarted; closes on the installed-tree click and the 09-27 digest twin`
+`status: ACTIVATED (2026-09-26) — T901 done, T902 merged to main `3a02156` + pipx reinstalled + light agent restarted; installed-tree click confirmed 13:14; closes when the 09-27 10:00 digest writes its .html twin (check from main)`
 
 ## Destination
 

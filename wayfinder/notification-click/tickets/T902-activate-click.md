@@ -42,8 +42,10 @@ step 2 was already done); merged main into the branch (one conflict,
 `com.slav-it.fs-coil` kickstarted (pid 24990 → 89286, program
 `~/.local/bin/fs-coil`). Banner "click test (T902, installed tree)"
 posted from the pipx venv with `click_path` = today's `.html` twin —
-its click is the closing criterion, together with the 09-27 10:00 digest
-writing both files.
+clicked 13:14 EDT — opened the digest in the browser (user confirmed).
+First closing criterion holds. Remaining: the 09-27 10:00 digest writing
+both `digest-2026-09-27.txt` and `.html` (an observation from main;
+this branch's worktree is disposable after this commit).
 
 ## Answer
 
