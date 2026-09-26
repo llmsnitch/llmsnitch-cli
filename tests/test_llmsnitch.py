@@ -771,6 +771,21 @@ def test_new_files_created_0600():
     _with_tmp_store(body)
 
 
+def test_setup_snapshot_dir_is_0700_and_file_0600():
+    # The config tree is a second home for our data; the perms doctrine
+    # (README constraint 5) was only ever pinned over ~/.llmsnitch/.
+    with tempfile.TemporaryDirectory() as t:
+        sp = Path(t) / "s.json"
+        sp.write_text('{"model": "opus"}')
+        sd = Path(t) / "cfg" / "llmsnitch"   # created fresh, not pre-made
+        assert setup_cmd.run(True, io.StringIO(), settings_path=str(sp),
+                             env={}, snap_dir=str(sd)) == 0
+        assert oct(sd.stat().st_mode & 0o777) == "0o700", oct(sd.stat().st_mode)
+        snaps = list(sd.glob("settings-snapshot-*.json"))
+        assert len(snaps) == 1, snaps
+        assert oct(snaps[0].stat().st_mode & 0o777) == "0o600", oct(snaps[0].stat().st_mode)
+
+
 def test_hook_session_id_traversal_contained():
     from tests._seams import with_tmp
     def body(t, delivered, errors):

@@ -81,6 +81,14 @@ class Notifier:
         if self._icon_dir is not None:
             try:
                 self._icon_dir.mkdir(parents=True, exist_ok=True)
+                # Dirs 0700 (README constraint 5) — mkdir alone leaves the
+                # umask default, and this is the call that first creates the
+                # llmsnitch-owned tree on a machine where setup never ran.
+                for p in (self._icon_dir, self._icon_dir.parent):
+                    try:
+                        os.chmod(p, 0o700)
+                    except OSError:
+                        pass
                 self._chown_user(self._icon_dir)
             except OSError:
                 pass

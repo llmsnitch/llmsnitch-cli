@@ -11,6 +11,8 @@ import os
 import time
 from pathlib import Path
 
+from llmsnitch import store
+
 _EVENTS = ("PreToolUse", "PostToolUse", "Stop")
 
 
@@ -45,9 +47,10 @@ def run(write, out, settings_path=None, env=None, snap_dir=None):
     if sp.exists():
         sd = Path(snap_dir).expanduser() if snap_dir else \
             Path("~/.config/llmsnitch").expanduser()
-        sd.mkdir(parents=True, exist_ok=True)
+        store._mkdir_private(sd)
         snap = sd / f"settings-snapshot-{time.strftime('%Y%m%d%H%M%S')}.json"
-        snap.write_text(sp.read_text())
+        with open(store._open_private(snap, os.O_WRONLY | os.O_TRUNC), "w") as fh:
+            fh.write(sp.read_text())
         out.write(f"[OK] snapshot: {snap}\n")
         try:
             settings = json.loads(sp.read_text())

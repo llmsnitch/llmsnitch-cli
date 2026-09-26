@@ -241,5 +241,25 @@ def test_icon_key_is_filename_safe():
     assert _icon_key("claude-code") == "claude-code"
 
 
+def test_icon_dir_created_0700():
+    """Notifier's constructor is the one call that creates the llmsnitch-owned
+    icon cache tree — dirs 0700 (README constraint 5), not the umask default."""
+    import tempfile
+    from fs_coil import notifier as nt
+    with tempfile.TemporaryDirectory() as t:
+        home = Path(t) / "home"
+        home.mkdir()
+        old_u, old_h = nt.console_user, nt.user_home
+        nt.console_user, nt.user_home = (lambda: "tester"), (lambda u: str(home))
+        try:
+            n = nt.Notifier()
+        finally:
+            nt.console_user, nt.user_home = old_u, old_h
+        icons = home / "Library" / "Caches" / "llmsnitch" / "fs-coil" / "icons"
+        assert n._icon_dir == icons, n._icon_dir
+        for p in (icons, icons.parent):
+            assert oct(p.stat().st_mode & 0o777) == "0o700", (str(p), oct(p.stat().st_mode))
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))
