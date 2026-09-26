@@ -1,7 +1,7 @@
 # Digest Rollup — Wayfinder Map
 
 `label: wayfinder:map`
-`status: T1001 DONE (2026-09-26); T1002 activate in progress`
+`status: ACTIVATED (2026-09-26 13:05; T1001 done, T1002 live on the pipx tree) — closes on the 09-27 and 09-28 10:00 digests`
 
 ## Destination
 
@@ -103,6 +103,12 @@ them, and whose ③ still counts them.
   ③)`, ③ and ④ byte-identical to the shipped digest. Orchestrator
   re-verified log, base, diff, and gate in the agent worktree before the
   ff-merge; inline review (table row 1) found nothing to change.
+- [T1002 — Activate digest rollup](tickets/T1002-activate-digest-rollup.md)
+  — activated 2026-09-26 13:05 by the orchestrator: `pipx install --force`
+  (installed `digest.py` diff-clean against main `3bcd53e`), one foreground
+  `fs-coil digest`: ② `(2 · 131 digest-only, see ③)` with only the two HIGH
+  groups; ③ 101 + 30 no-decision new subjects = 131, reconciles; no
+  re-page. Closes on the 09-27 / 09-28 scheduled digests.
 
 ## Tickets
 

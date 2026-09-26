@@ -4,7 +4,28 @@
 `parent: ../map.md`
 `blocked by: T1001`
 `blocks: —`
-`status: OPEN — the user's to run (merge + reinstall from a plain terminal)`
+`status: ACTIVATED (2026-09-26 13:05) — closes on two consecutive scheduled 10:00 digests (09-27, 09-28)`
+
+## Resolution (activation, 2026-09-26)
+
+- **Executed by the orchestrator** (user asked for T1001 → T1002 in-session):
+  `main` ff'd to `3bcd53e` (T1001 + map), `pipx install --force
+  ~/llmsnitch-cli` at 13:05:44 — installed `fs_coil/digest.py` mtime
+  13:05:44, `diff` clean against main. The digest LaunchAgent already runs
+  `~/.local/bin/fs-coil`, so no plist work.
+- **Foreground `fs-coil digest`** (rewrote today's file over the window
+  2026-09-25 10:00 → 2026-09-26 13:05, 306 rows): ② header **`(2 · 131
+  digest-only, see ③)`**, body = `[HIGH] scan_finding` (playwright
+  `drift_added`) + `[HIGH] watcher_health` (bulletin stale); **no
+  `agent_plugin_cache` / `agent_self` lines**. ③ `agent_plugin_cache ·
+  claude-code 242 101/0/66`, `agent_self · claude-code 46 30/1/0` — 101 +
+  30 = 131, the header reconciles. ④ unchanged in shape (four
+  `…/.git/config` at 15 rows). Ledger tail: `watcher_health ·
+  window_repeat · notified=false` — the health banner rule did not re-page.
+- **Pending**: close criteria need the scheduled 10:00 digests of 09-27
+  and 09-28 (window now starts at today's 13:05 rewrite — no gap, no
+  double count). `fs-coil noise --category agent_plugin_cache --days 1`
+  recall unchanged (read side of the ledger, not the digest).
 
 ## Question
 
