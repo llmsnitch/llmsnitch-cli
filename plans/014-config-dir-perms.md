@@ -1,6 +1,6 @@
 # Plan 014 — `~/.config/llmsnitch/` created at 0755, not 0700
 
-- **Status:** TODO
+- **Status:** DONE (shipped `b5d655a`; site 3 corrected post-execution — see Offender sites)
 - **Priority:** P2 (live perms gap on a dir that has held copies of the user's
   `settings.json`; no remote exposure on a single-user Mac)
 - **Effort:** XS
@@ -22,15 +22,21 @@ log tree are correct in practice:
 | `~/.llmsnitch/` | `0700` ✅ | `store._mkdir_private` |
 | `~/Library/Logs/llmsnitch/{,notify,fs-coil}` | `0700` ✅ | `logger.py:87-92`, `notify._mkdir_owned(d, 0o700)` |
 | **`~/.config/llmsnitch/`** | **`0755` ❌** | **nothing** |
+| **`~/Library/Caches/llmsnitch/fs-coil{,/icons}`** | **`0755` ❌** | **nothing** |
 
-One directory is wrong, and it is the one that until last week held 199
+*(The Caches row was added 2026-09-26 after execution — the original survey
+missed that tree entirely, which is what produced the site-3 error corrected
+below. Its grandparent `~/Library/Caches/llmsnitch` was already 0700, so
+nothing was exposed in practice.)*
+
+The `~/.config/llmsnitch/` one is the directory that until last week held 199
 verbatim copies of `~/.claude/settings.json` — hook command lines included.
 Those snapshots were themselves `0644`. Both facts trace to a single bare
 `mkdir` with no mode and a `write_text` at default umask.
 
-**No test covers `~/.config/llmsnitch/` at all.** That is why "enforced"
-was true in CLAUDE.md and false on disk: the tests pin the store tree, and
-the config tree grew a second home for our data without picking up the rule.
+**No test covered either tree.** That is why "enforced" was true in CLAUDE.md
+and false on disk: the tests pin the store tree, and every later home for
+llmsnitch-owned data grew without picking up the rule.
 
 ## Offender sites
 
@@ -39,10 +45,28 @@ the config tree grew a second home for our data without picking up the rule.
    the `sd` local, seamed by `snap_dir`.)*
 2. **`llmsnitch/setup_cmd.py:50`** — `snap.write_text(sp.read_text())` writes
    the snapshot at umask default (0644 observed), not 0600.
-3. **`fs_coil/notifier.py:50`** — `self._icon_dir.mkdir(parents=True,
-   exist_ok=True)` for `~/.config/llmsnitch/icons`. Latent: the dir does not
-   exist on this machine yet, but it would be created 0755 **and would create
-   the 0755 parent** on a machine where setup never ran.
+3. **`fs_coil/notifier.py:83`** — `self._icon_dir.mkdir(parents=True,
+   exist_ok=True)` for the icon cache dir, created at umask default.
+
+   > **Correction (2026-09-26, after execution).** This plan originally
+   > named the path here as `~/.config/llmsnitch/icons` and cited line 50.
+   > Both were wrong. The module defines two similar attributes on adjacent
+   > lines, and the planning survey conflated them:
+   >
+   > | line | attribute | path | used how |
+   > |------|-----------|------|----------|
+   > | 77 | `_icon_dir` | `~/Library/Caches/llmsnitch/fs-coil/icons` | **created** (mkdir, line 83) |
+   > | 78 | `_icon_override_dir` | `~/.config/llmsnitch/icons` | **read only** (lines 108, 110) |
+   >
+   > `notifier.py` never creates anything under `~/.config/llmsnitch/`, so
+   > this plan's stated goal for site 3 — "would create the 0755 parent" —
+   > was unachievable and is withdrawn. The defect is real but lives in the
+   > Caches tree: `fs-coil` and `fs-coil/icons` were both **0755 live** when
+   > executed (grandparent `~/Library/Caches/llmsnitch` was already 0700, so
+   > nothing was actually exposed). The fix as specified — inline chmod 0700
+   > over the dir and its parent, `logger.py`'s in-package pattern, no
+   > `fs_coil.notify` import — was applied to the real mkdir site unchanged.
+   > Shipped in `b5d655a`.
 
 ## Explicitly NOT in scope
 
@@ -92,7 +116,7 @@ Then swap both lines inside the `if sp.exists():` branch:
 `_open_private` creates at 0600 with no umask window — the same reason the
 store uses it. `os` is already imported in this module.
 
-### `fs_coil/notifier.py:50`
+### `fs_coil/notifier.py:83`
 
 Do **not** import `fs_coil.notify` here for `_mkdir_owned` — `notify` is the
 delivery layer and importing it from the notifier risks a cycle. Use the
@@ -111,8 +135,12 @@ inline pattern `fs_coil/logger.py:87-92` already establishes in this package:
                 pass
 ```
 
-The parent is included deliberately: on a machine where `setup --write` never
-ran, this is the call that first creates `~/.config/llmsnitch/`.
+The parent is included deliberately: this is the call that first creates the
+icon-cache chain, so the dir and its immediate parent (`.../fs-coil/icons` and
+`.../fs-coil`) both need the mode. *(Corrected: the original text claimed this
+call creates `~/.config/llmsnitch/` — it does not; see the site-3 correction
+above. The grandparent `~/Library/Caches/llmsnitch` stays uncovered by this
+two-level fix, and was already 0700 live.)*
 
 ---
 
@@ -145,15 +173,21 @@ style:
 
 2. **`test_icon_dir_created_0700`** (in whichever file covers `notifier.py` —
    confirm with `grep -rl "notifier" tests/`). Construct the notifier with a
-   `home` pointing at a tmp dir, assert both `<home>/.config/llmsnitch` and
-   `<home>/.config/llmsnitch/icons` come out `0700`. If the notifier's
-   constructor is awkward to drive in isolation, **STOP** and report rather
-   than reshaping production code to be testable — the setup_cmd test is the
-   one that pins the live bug; this one is defense in depth.
+   `home` pointing at a tmp dir and assert the icon cache dir and its parent
+   come out `0700`. If the notifier's constructor is awkward to drive in
+   isolation, **STOP** and report rather than reshaping production code to be
+   testable — the setup_cmd test is the one that pins the live bug; this one
+   is defense in depth.
+
+   *(As executed: landed in `tests/test_notify.py`, driving the constructor by
+   patching the module-level `notifier.console_user` / `notifier.user_home`
+   seams — no production code reshaped, STOP did not fire. The asserted paths
+   are under `Library/Caches/...`, not `.config/...`, per the correction
+   above.)*
 
 ## Done criteria (machine-checkable)
 
-- `python3 tests/all.py` → all pass (182 + 1 or 2 new).
+- `python3 tests/all.py` → all pass (as executed: 226/226; the "182" figure was stale by dispatch time).
 - `python3 -m compileall -q llmsnitch fs_coil` → clean.
 - Snapshot-leak regression from 013 still holds: snapshot count in
   `~/.config/llmsnitch/` unchanged across a full suite run.
@@ -162,19 +196,28 @@ style:
 
 ## One-time cleanup (user runs; not part of the commit)
 
-The code fix only governs dirs created from here on. The existing dir keeps
-its mode until changed:
+The code fix only governs dirs created from here on. Existing dirs keep their
+mode until changed:
 
 ```sh
-chmod 700 ~/.config/llmsnitch
+chmod 700 ~/.config/llmsnitch                        # DONE 2026-09-26, verified drwx------
+chmod 700 ~/Library/Caches/llmsnitch/fs-coil{,/icons}  # still 0755; gated by a 0700 grandparent
 ```
 
-Verify: `stat -f '%Sp %N' ~/.config/llmsnitch` → `drwx------`.
+Verify: `stat -f '%Sp %N' <dir>` → `drwx------`.
 
 ## Maintenance note
 
 The reason this drifted is worth recording: the perms rule was enforced by
-tests that all live over `~/.llmsnitch/`, and `~/.config/llmsnitch/` became a
-second data home later without inheriting the rule. **Any future third
-location for llmsnitch-owned state needs a perms assertion at the same time
-it is introduced** — the doctrine line in `README.md` is not self-enforcing.
+tests that all live over `~/.llmsnitch/`, and **two** later homes for
+llmsnitch-owned state — `~/.config/llmsnitch/` and
+`~/Library/Caches/llmsnitch/` — never inherited it. **Any future location for
+llmsnitch-owned state needs a perms assertion at the same time it is
+introduced** — the doctrine line in `README.md` is not self-enforcing.
+
+A second lesson, from this plan's own site-3 error: **a survey that greps for
+`mkdir` finds the call but not the path.** The planning pass read a line
+window containing `_icon_override_dir`'s `.config` path and `_icon_dir`'s
+`mkdir` and fused them into one claim without checking where `_icon_dir` was
+defined (11 lines earlier). When a plan asserts *which path* a call touches,
+resolve the variable to its definition — don't infer it from proximity.
