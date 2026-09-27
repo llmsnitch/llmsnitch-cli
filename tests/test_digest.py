@@ -266,7 +266,7 @@ def test_cmd_digest_window_starts_at_previous_digest():
 def test_cmd_digest_show_before_any_digest():
     def body(t, delivered, errors):
         code, out = _run(show=True)
-        assert code == 0 and out == "no digest yet\n"
+        assert code == 0 and out.startswith("no digest yet") and "--install-agent" in out
     _tmp(body)
 
 

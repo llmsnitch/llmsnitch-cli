@@ -200,7 +200,9 @@ def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
     d = ledger.ledger_dir()
     files = ledger.digest_files(d)
     if show:
-        out.write(Path(files[-1]).read_text() if files else "no digest yet\n")
+        out.write(Path(files[-1]).read_text() if files else
+                  "no digest yet — run `fs-coil digest` to write one "
+                  "(--install-agent --write installs the daily 10:00 agent)\n")
         return 0
     end = now if now is not None else time.time()
     today = datetime.fromtimestamp(end).strftime("%Y-%m-%d")

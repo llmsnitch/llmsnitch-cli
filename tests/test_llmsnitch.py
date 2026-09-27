@@ -252,6 +252,29 @@ def test_scan_rule_pack_sd020_sd022():
         uq = by_rule.get("hook_unquoted_var", [])
         assert len(uq) == 1, uq   # $PROMPT only; quoted + CLAUDE_* spared
         assert uq[0]["category"] == "scan_hygiene" and uq[0]["severity"] == "low"
+        # hint absent from JSON output
+        assert "--waive RULE_ID ARTIFACT" not in buf.getvalue()
+        # hint present in text output (critical dns_exfil_dynamic_host fires)
+        tbuf = io.StringIO()
+        scan.cmd_scan([str(t / "proj"), "--format", "text"], tbuf)
+        assert "--waive RULE_ID ARTIFACT" in tbuf.getvalue(), tbuf.getvalue()
+    _with_tmp_store(body)
+
+
+def test_scan_waive_hint_absent_on_no_critical():
+    """Waive hint does NOT appear when all findings are low/medium severity."""
+    from llmsnitch import scan
+    def body(t):
+        cdir = t / "proj" / ".claude"
+        hooks = cdir / "hooks"
+        hooks.mkdir(parents=True)
+        (cdir / "settings.json").write_text(json.dumps({"hooks": {"Stop": [
+            {"hooks": [
+                {"type": "command", "command": "notify-send $PROMPT"},
+            ]}]}}))
+        tbuf = io.StringIO()
+        scan.cmd_scan([str(t / "proj"), "--format", "text"], tbuf)
+        assert "--waive RULE_ID ARTIFACT" not in tbuf.getvalue(), tbuf.getvalue()
     _with_tmp_store(body)
 
 
@@ -278,18 +301,20 @@ def test_patrol_plist_print_write_and_refusal():
     from llmsnitch import patrol
     buf = io.StringIO()
     assert patrol.run(False, buf) == 0
-    text = buf.getvalue()
+    full_out = buf.getvalue()
+    header, xml = full_out.split("\n", 1)
+    assert "(or re-run with --write)" in header, header
     for needle in (patrol.LABEL, "--patrol", "patrol.err",
                    "StartCalendarInterval"):
-        assert needle in text, needle
+        assert needle in xml, needle
     if shutil.which("plutil"):
-        r = subprocess.run(["plutil", "-lint", "-"], input=text.encode(),
+        r = subprocess.run(["plutil", "-lint", "-"], input=xml.encode(),
                            capture_output=True)
         assert r.returncode == 0, r.stdout + r.stderr
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "x.plist"
         assert patrol.run(True, io.StringIO(), plist_path=str(p)) == 0
-        assert p.read_text() == text
+        assert p.read_text() == xml
     assert patrol.run(True, io.StringIO(),
                       plist_path="/dev/null/nope/x.plist") == 2
 

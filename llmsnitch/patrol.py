@@ -48,6 +48,8 @@ def plist():
 def run(write, out, plist_path=None):
     text = plist()
     if not write:
+        out.write(f"Save as ~/Library/LaunchAgents/{LABEL}.plist "
+                  "(or re-run with --write):\n")
         out.write(text)
         return 0
     default = plist_path is None   # overriding the path is the test seam:
