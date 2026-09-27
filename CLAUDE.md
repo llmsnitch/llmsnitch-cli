@@ -4,7 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo doctrine (read before editing)
 
-- **`README.md`** — design constraints. All test-enforced, all non-negotiable.
 - **`AGENTS.md`** — the Decision/Actor/Novelty test every user-facing alert must pass.
 - **`CONTEXT.md`** — canonical vocabulary (Surface, Outlet, Category, Cold trail, Hot state, …). Use these words in code, config, and docs.
 - **`docs/notifier-spec.md`** — the notify-layer destination.

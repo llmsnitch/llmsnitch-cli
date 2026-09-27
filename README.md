@@ -1,43 +1,39 @@
 # llmsnitch
 
-Local-only tracing and cost/health auditing for AI coding agents. One tool,
-one name, zero network code, zero dependencies.
+See what your AI coding agent actually did. llmsnitch records every tool
+call your agent makes — what ran, what failed, what it cost — into plain
+local files you own. Nothing to sign into, nothing leaves your machine.
 
-Own reimplementation of ideas from three MIT-licensed projects — none vendored,
-none wrapped, no upstream to get abandoned or to flip telemetry on:
-
-| Idea | Inspired by | What we kept | What we dropped |
-|---|---|---|---|
-| Hook-based tool-call capture | [Siddhant-K-code/agent-trace](https://github.com/Siddhant-K-code/agent-trace) | PreToolUse/PostToolUse/Stop → NDJSON | 60+ subcommands, server/SSO/RBAC, default-ON PostHog telemetry |
-| Session health gate + exit codes | [luoyuctl/agenttrace](https://github.com/luoyuctl/agenttrace) | cost/fail-rate/health thresholds, edge-friendly `check` | Rust toolchain, inverted exit codes (2=breach) |
-| Cost accounting | [tensorstax/agenttrace](https://github.com/tensorstax/agenttrace) | per-model token→dollar math | in-process SDK coupling |
-
-## Design constraints (non-negotiable)
-
-- **No network code.** No `urllib`, no `socket`, no exceptions — a test greps
-  the package and fails the build if one appears. Telemetry isn't opt-out;
-  it doesn't exist.
-- **Stdlib only, Python 3.9+.** `dependencies = []` is a constraint, not a status.
-- **Flat files.** NDJSON events + one meta.json per session under
-  `~/.llmsnitch/sessions/` (override: `LLMSNITCH_DIR`). Files `0600`,
-  dirs `0700`. No database, no daemon.
-- **The hot path never blocks the agent.** The hook handler always exits 0,
-  prints nothing, and swallows its own failures.
-- **Secrets are redacted at capture time** (API keys, GitHub/Slack tokens,
-  AWS key ids, JWTs) — what never lands on disk can't leak later.
-- **Sane exit codes:** `check` returns 0 pass / 1 breach / 2 operational.
+- **Zero network code.** No telemetry, no phone-home — a test greps the
+  package and fails the build if a network import ever appears.
+- **Secrets never reach disk.** API keys, tokens, and JWTs are redacted at
+  capture time.
+- **Plain files.** NDJSON under `~/.llmsnitch/`, readable with the CLI or
+  any text tool. No database, no daemon.
+- **Zero dependencies.** Stdlib-only Python 3.9+.
 
 ## Install
 
+From a clone of this repo:
+
 ```bash
-pip install .            # or: pip install --user .
-llmsnitch setup      # prints the Claude Code hooks block
-llmsnitch setup --write   # installs it (snapshots settings.json first)
+# with uv
+uv tool install .
+
+# or with pip in a virtualenv
+python3 -m venv .venv && source .venv/bin/activate
+pip install .
 ```
 
-`setup --write` refuses to run from inside a Claude Code session: the settings
-file that wires the hooks is exactly the file a monitored agent must never
-edit about itself.
+## Set up
+
+```bash
+llmsnitch setup          # preview the Claude Code hooks block
+llmsnitch setup --write  # install it (snapshots settings.json first)
+```
+
+Run `setup --write` from a plain terminal, not from inside a Claude Code
+session. Start a new agent session and it's recording.
 
 ## Use
 
@@ -45,28 +41,24 @@ edit about itself.
 llmsnitch list             # sessions: tools, errors, health, cost
 llmsnitch show <id>        # one session in detail
 llmsnitch check            # gate: exit 0 pass / 1 breach / 2 error
-llmsnitch ingest           # sweep non-Claude harness ledgers (codex, ...)
-llmsnitch scan             # config-audit over agent artifacts
-llmsnitch scan --waive RULE_ID ARTIFACT --reason TEXT   # waive one finding pair (re-raises if its evidence changes)
+llmsnitch scan             # audit agent configs for risky artifacts
+llmsnitch ingest           # pull in non-Claude harnesses (codex, ...)
 llmsnitch patrol           # print/--write the daily-scan LaunchAgent
 ```
 
-The notify layer's read side (`fs-coil`, installed alongside):
+A companion CLI, `fs-coil`, reads the notification ledger:
 
 ```bash
-fs-coil digest              # write today's digest of the notify ledger (trailing 24h)
-fs-coil digest --show       # print the newest digest
-fs-coil digest --install-agent [--write]   # print/install the 10:00 digest LaunchAgent
-fs-coil noise [--category X] [--actor B] [--days N] [--all]   # ledger recall, grouped
-fs-coil prune --target notify [--days N]   # ledger + digest retention (default 45 days)
-fs-coil status              # daemon + notifier degraded flag
+fs-coil digest --show      # print today's digest
+fs-coil noise              # recall notifications, grouped
+fs-coil status             # watcher health
 ```
 
-The digest is written to `~/Library/Logs/llmsnitch/notify/digest-YYYY-MM-DD.txt` after the 09:30 patrol. It banners only when the watchers themselves are unhealthy (patrol missed, dep-audit missed, bulletin stale, notifier degraded) — never to re-page a finding. `[notify] outlet_digest = false` silences that banner; the file is always written.
+The daily digest lands in `~/Library/Logs/llmsnitch/notify/`.
 
-Patrol logs live at `~/Library/Logs/llmsnitch/patrol.{out,err}`.
+## Configure
 
-Thresholds in `~/.config/llmsnitch/config`:
+Thresholds live in `~/.config/llmsnitch/config`:
 
 ```ini
 [gate]
@@ -77,36 +69,24 @@ range = latest             # latest | today | all
 billing_mode = subscription  # subscription | per_token
 
 [scan]
-discover_roots = ~:~/Library/Application Support
+discover_roots = ~:~/Library/Application Support  # colon-separated roots the scan probes for agent homes
 ```
 
-**`discover_roots`** — colon-separated roots (PATH convention) whose
-top-level directories the scan probes for un-dossiered agent homes; default
-`~` (under `$HOME`, dot-dirs only). Widening coverage toward new install
-locations — e.g. the scanner survey's snyk table (§2.2) — is exactly this
-key, no code change.
+On Claude Max/Pro you don't pay per token, so in `subscription` mode
+(the default) cost is shown as an estimate (`~$X`) and the cost gate is
+off — errors and health still gate. Switch to `per_token` for
+pass-through billing and the cost ceiling enforces.
 
-Cost comes from the Claude Code transcript's own `usage` records, priced by
-the table in `transcript.py` — an offline estimate you can edit, not a
-metered bill.
-
-**`billing_mode`** — most users are on Claude Max/Pro and don't pay per token.
-In `subscription` mode (default) the cost figure is labeled as an estimate
-(`~$X`) and the cost gate is disabled — errors and health still gate. Switch
-to `per_token` for pass-through billing, and the cost ceiling enforces.
-Anthropic hasn't published Fable pricing; unknown models fall to sonnet-tier
-with a note rather than an invented rate.
-
-## Test
+## Development
 
 ```bash
 python3 tests/all.py
 ```
 
-Each file under `tests/` also runs standalone, e.g.
-`python3 tests/test_llmsnitch.py`.
-
 ## License
 
-MIT. The three projects above are acknowledged as prior art; no code was
-copied from any of them.
+MIT. Reimplements ideas from
+[Siddhant-K-code/agent-trace](https://github.com/Siddhant-K-code/agent-trace),
+[luoyuctl/agenttrace](https://github.com/luoyuctl/agenttrace), and
+[tensorstax/agenttrace](https://github.com/tensorstax/agenttrace) —
+acknowledged as prior art, no code copied.

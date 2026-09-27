@@ -243,7 +243,7 @@ def test_icon_key_is_filename_safe():
 
 def test_icon_dir_created_0700():
     """Notifier's constructor is the one call that creates the llmsnitch-owned
-    icon cache tree — dirs 0700 (README constraint 5), not the umask default."""
+    icon cache tree — dirs 0700 (CLAUDE.md constraint 5), not the umask default."""
     import tempfile
     from fs_coil import notifier as nt
     with tempfile.TemporaryDirectory() as t:
