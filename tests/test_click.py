@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T901 guards: a banner click opens the newest digest (wayfinder/
+"""T901 guards: a banner click opens the newest digest (.wayfinder/
 notification-click D01–D06). Stdlib only, no root, no banners posted.
 
 Run: python3 tests/test_click.py

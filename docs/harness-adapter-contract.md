@@ -1,10 +1,10 @@
 # Harness Adapter Contract
 
 Status: **accepted** — resolution of wayfinder ticket
-[T102](../wayfinder/harness-team/tickets/T102-adapter-contract.md)
+[T102](../.wayfinder/harness-team/tickets/T102-adapter-contract.md)
 (16 decisions across 3 grilling rounds, 2026-08-24). This document is the
 contract every harness adapter implements and every team run
-([T104](../wayfinder/harness-team/tickets/T104-team-design.md)'s pipeline)
+([T104](../.wayfinder/harness-team/tickets/T104-team-design.md)'s pipeline)
 is gated against. Vocabulary is canonical in `CONTEXT.md`; read it first.
 
 ## Purpose doctrine
@@ -136,7 +136,7 @@ sanitization, by structure rather than by pattern.
 
 Tool inputs/outputs that are copied get the full existing treatment before
 disk: `hook._clean` depth-walk, `_SECRET` redaction, the NFKC canonical
-fold from `docs/research/unicode-evasion-redaction.md`, 2000-char string
+fold from `.research/unicode-evasion-redaction.md`, 2000-char string
 caps. Only the redacted copy exists in our store.
 
 If message-body ingestion is ever wanted, free-text PII redaction becomes

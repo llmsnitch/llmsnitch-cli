@@ -1,13 +1,13 @@
 # Bulletin contract v1
 
 `schema_version: 1` — accepted 2026-09-11
-(ticket `wayfinder/dep-audit/tickets/T503-bulletin-schema.md`)
+(ticket `.wayfinder/dep-audit/tickets/T503-bulletin-schema.md`)
 
 The contract between the bulletin **provider** (out of scope for this repo —
-`wayfinder/dep-audit/map.md`) and the llmsnitch CLI **consumer**. Vocabulary
+`.wayfinder/dep-audit/map.md`) and the llmsnitch CLI **consumer**. Vocabulary
 (Bulletin, Intake, Waiver) is canon in `CONTEXT.md`. Grounding:
-`docs/research/dep-audit-advisory-sources.md` (T501),
-`docs/research/dep-audit-stdlib-matching.md` (T502),
+`.research/dep-audit-advisory-sources.md` (T501),
+`.research/dep-audit-stdlib-matching.md` (T502),
 `docs/adr/0001-bulletin-egress.md` (egress model).
 
 ## Artifact

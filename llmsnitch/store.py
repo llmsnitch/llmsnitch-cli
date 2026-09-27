@@ -64,7 +64,7 @@ def waivers_path():
 
 def waivers_raw():
     """Every row of the shared waivers file, any surface (D05,
-    wayfinder/quiet-patrol). Writers append to this, never to a filtered
+    .wayfinder/quiet-patrol). Writers append to this, never to a filtered
     view, or they silently drop the other surface's waivers."""
     try:
         raw = json.loads(waivers_path().read_text())

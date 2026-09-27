@@ -4,7 +4,7 @@ Ramparts loads rules from a runtime-resolved directory, ships none in its
 crate, and documents the resulting silent fail-open-with-zero-rules
 (ramparts src/scanner.rs:73-78). skill-detector compiles rules into the
 binary and stamps a ruleset checksum into every result. We follow
-skill-detector: see docs/research/scanner-survey-mvp.md §2.1.
+skill-detector: see .research/scanner-survey-mvp.md §2.1.
 
 Severity is fixed per category (spec §2.5): config_compromise=critical,
 secret_at_rest=high, config_drift=high (control surfaces), scan_hygiene=low,

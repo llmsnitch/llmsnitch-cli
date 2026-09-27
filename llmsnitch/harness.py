@@ -3,7 +3,7 @@
 An adapter is a declarative entry plus an optional parser (code hook).
 Parsers read ONLY usage/lifecycle/error fields from a harness's own session
 files — message/tool bodies are skipped unread (contract C6). Facts come
-from dossiers/<name>.md; do not invent fields the dossier doesn't cite.
+from .dossiers/<name>.md; do not invent fields the dossier doesn't cite.
 """
 
 import hashlib
@@ -132,11 +132,11 @@ def src_info(path):
 
 # Only fields ingest.sweep reads: session_paths, home_env, home_default,
 # parser. Everything else a harness dossier records (signing ids, config
-# paths, tiers) lives in dossiers/<name>.md — facts, not code. claude-code
+# paths, tiers) lives in .dossiers/<name>.md — facts, not code. claude-code
 # has no entry: its live capture ships via hooks, and a ledger parser for
 # its transcripts is a future team run (contract C2 diff-check).
 HARNESSES = {
-    # dossiers/codex.md §8
+    # .dossiers/codex.md §8
     "codex": {
         "session_paths": ["~/.codex/sessions/*/*/*/rollout-*.jsonl"],
         "home_env": "CODEX_HOME",               # trap 9: relocates ~/.codex

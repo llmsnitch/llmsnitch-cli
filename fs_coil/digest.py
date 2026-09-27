@@ -1,5 +1,5 @@
 """Daily digest — the notify layer's pull outlet (docs/notifier-spec.md §3,
-wayfinder/digest-outlet). Renders the ledger's trailing 24h: ① health,
+.wayfinder/digest-outlet). Renders the ledger's trailing 24h: ① health,
 ② new since last digest, ③ counts, ④ noisiest. Banners only when the
 watchers themselves are unhealthy — findings never re-page from here.
 
@@ -218,7 +218,7 @@ def cmd_digest(*, full=False, show=False, prune=False, install_agent=False,
     notify._mkdir_owned(d, 0o700)
     path = os.path.join(d, f"digest-{today}.txt")
     _write_private(path, text)
-    # Browser twin — what a banner click opens (wayfinder/notification-click
+    # Browser twin — what a banner click opens (.wayfinder/notification-click
     # D01): the .html default handler is a browser on every OS, never an IDE.
     _write_private(path[:-4] + ".html",
                    f"<!doctype html><meta charset=utf-8><title>llmsnitch digest "

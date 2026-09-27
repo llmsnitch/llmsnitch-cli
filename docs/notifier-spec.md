@@ -1,7 +1,7 @@
 # Notifier Redesign Spec
 
 **Status**: accepted — this is the wayfinder map's destination artifact
-(`wayfinder/map.md`, decisions D01–D27). Every design choice below cites the
+(`.wayfinder/map.md`, decisions D01–D27). Every design choice below cites the
 map decision it derives from. The audience is a fresh Claude Code session
 executing the migration; nothing here assumes conversation context.
 
@@ -84,7 +84,7 @@ In scope — all llmsnitch alert surfaces (D02):
 | `config-audit` | `llmsnitch scan` — cold-path config audit over agent artifacts | user, on demand |
 | *(future)* | any new watcher (e.g. proc-eye) calls the same API | — |
 
-> **Retired surfaces (2026-08-27, `wayfinder/rd-triage/map.md`)**: the
+> **Retired surfaces (2026-08-27, `.wayfinder/rd-triage/map.md`)**: the
 > `session-shed` (agenttrace health-gate wrapper) and `agent-flick`
 > (agent-strace cost-gate wrapper) surfaces were cleared from the repo —
 > their wrapped upstream binaries are not installed and llmsnitch is the
@@ -260,7 +260,7 @@ config (D05): config selects and tunes, it never invents categories.
 | `keychain_access` | Deep mode: `security find-generic-password` etc. by a watched process (except when `agent_signed_self_read` matches — predicate `is_signed_self_read(pinfo, path)`, which lives in `fs_coil/agent_registry.py`; `monitor.py` calls it and passes the resulting category) | 5m | high | check which item was read; rotate if unexpected |
 | `threshold_breach` | gate verdict transition (reserved — original wrapper emitters retired 2026-08-27) | edge-triggered (0) | high | review the session; kill the runaway session |
 | `scan_finding` | `llmsnitch scan` finding routed by the config-audit surface. **Quiet by design**: the notify tier is capped at `high` and never pierces cold start — a critical finding is labeled in the subject (`critical <rule_id>: <path>`; other severities carry no label, the alert tier already says `high`), and every finding's full severity lives in the scan's own ledger; `scan --report` is the loud, complete view. info/low findings are `record_only` (no decision) except `drift_*`, which always names one (rebaseline or revert). | 24h | high | review the findings: `llmsnitch scan --report` |
-| `unattested_agent` | The scan finds an un-dossiered agent home: a directory with an agent-home signal (`scanrules.DISCOVERY_*`) outside every registered territory (plan 011). Scan-side category — it routes through `scan_finding` and so is **quiet on cold start**: the first-ever scan lands in ledger + digest + exit code only; the next patrol banners it. | 24h | high | attest or remove — add `dossiers/<name>.md` to bring it under coverage if you installed it; otherwise remove the directory and rotate any credential it could read |
+| `unattested_agent` | The scan finds an un-dossiered agent home: a directory with an agent-home signal (`scanrules.DISCOVERY_*`) outside every registered territory (plan 011). Scan-side category — it routes through `scan_finding` and so is **quiet on cold start**: the first-ever scan lands in ledger + digest + exit code only; the next patrol banners it. | 24h | high | attest or remove — add `.dossiers/<name>.md` to bring it under coverage if you installed it; otherwise remove the directory and rotate any credential it could read |
 
 Windows are expressed as duration strings: integer + `s`/`m`/`h`/`d`.
 Parser lives in `notify.py` (`parse_window("24h") → 86400`). The meaning of
@@ -604,7 +604,7 @@ from fields when the caller passes no `title`/`message`):
   `-group` suffix per banner (macOS otherwise collapses repeats),
   `launchctl asuser <uid> sudo -u <user>` when running as root, icon
   resolution unchanged. Delete only `_should_emit`/`_last`/`_cooldown`.
-- **Click** (`wayfinder/notification-click`, 2026-09-22/26): every banner
+- **Click** (`.wayfinder/notification-click`, 2026-09-22/26): every banner
   carries `-open file://<newest digest-YYYY-MM-DD.html>` — the digest's
   browser twin (§3), so a click opens the digest in the default browser on
   any OS (the `.txt` default handler is an IDE for most developers; a
@@ -639,7 +639,7 @@ fs-coil noise [--category X] [--actor B] [--days N] [--all]
 
 ### 3. Daily digest
 
-Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
+Amended by T601 (.wayfinder/digest-outlet, 2026-09-14) — supersedes the
 09:00 / threshold-banner design that preceded it.
 
 - `fs-coil digest [--full] [--show] [--prune]`, run daily at **10:00** by
@@ -661,7 +661,7 @@ Amended by T601 (wayfinder/digest-outlet, 2026-09-14) — supersedes the
   (D18); no config key disables it. Alongside it, a **browser twin**
   `digest-YYYY-MM-DD.html` — the same text `html.escape`d inside `<pre>`,
   same permissions — is the banner click target (outlet 1;
-  `wayfinder/notification-click`). `prune --target notify` covers both. `--show` prints the newest digest
+  `.wayfinder/notification-click`). `prune --target notify` covers both. `--show` prints the newest digest
   file; `--full` lifts the one-screen cap on section ②; `--prune` runs
   `prune --target notify` after writing (one plist command does both).
 - **Content, in order** (every line: Decision / Actor / Novelty):
@@ -749,7 +749,7 @@ wrappers need no restart (invoked per-run).
   copy first; if it needs sudo, `chown -R` the repo copies back to the user
   afterward (root-owned files in the repo break later `git add`). Stage with
   `git add fs_coil bin` only — never `git add -A` (untracked non-ticket dirs
-  like `wayfinder/` must stay out). The per-ticket install/restart step is a
+  like `.wayfinder/` must stay out). The per-ticket install/restart step is a
   deliberate no-op here: repo and installed files are byte-identical, the
   empty diff is the proof.
 - **Done criteria**: `diff -rq --exclude __pycache__ fs_coil /usr/local/share/llmsnitch/fs_coil`
@@ -797,7 +797,7 @@ wrappers need no restart (invoked per-run).
 
 ### T005 — Wire fs-coil light + deep through `notify()`
 
-**Light half executed by T801 (`wayfinder/quiet-light`, 2026-09-22)** with
+**Light half executed by T801 (`.wayfinder/quiet-light`, 2026-09-22)** with
 these deviations from the text below, kept as history: `agent_registry.py`
 had been deleted as dead code (`53b1ab4`), so attribution is a seven-line
 territory table plus `classify_light` inside `light_watcher.py` — path-only,
@@ -851,7 +851,7 @@ map's fog.
 
 ### T006 — Wire session-shed + agent-flick
 
-> **Retired (2026-08-27, `wayfinder/rd-triage/map.md`)**: the repo copies of
+> **Retired (2026-08-27, `.wayfinder/rd-triage/map.md`)**: the repo copies of
 > these wrappers were cleared (upstream binaries absent); this ticket is
 > moot unless the wrapped upstreams are ever reinstalled. Kept for the
 > track B record. Original ticket text follows.
@@ -888,7 +888,7 @@ map's fog.
 
 ### T007 — Delivery outlets + stopgap cleanup + docs
 
-**Executed by T601 (wayfinder/digest-outlet, 2026-09-14)** with these
+**Executed by T601 (.wayfinder/digest-outlet, 2026-09-14)** with these
 deviations from the text below, which is kept as history: the dashboard
 pane (`fs_coil/render_notify.py`) is **dropped** — out of scope on the
 digest-outlet map; `cmd_digest` lives in `fs_coil/digest.py` and the shared

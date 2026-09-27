@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`AGENTS.md`** — the Decision/Actor/Novelty test every user-facing alert must pass.
 - **`CONTEXT.md`** — canonical vocabulary (Surface, Outlet, Category, Cold trail, Hot state, …). Use these words in code, config, and docs.
 - **`docs/notifier-spec.md`** — the notify-layer destination.
-- **`wayfinder/*/map.md`** — decision records per effort (harness-team D01–D15, scan-rollout, submodule-clearout, rd-triage). Closed maps are history — never rewritten.
+- **`.wayfinder/*/map.md`** — decision records per effort (harness-team D01–D15, scan-rollout, submodule-clearout, rd-triage). Closed maps are history — never rewritten.
 
 ## Non-negotiable constraints
 
@@ -25,7 +25,7 @@ These are enforced by `tests/test_llmsnitch.py` — a change that breaks any of 
 
 Two packages ship in the wheel: `llmsnitch` (15 modules) and
 `fs_coil` (the notify layer — the scan's finding routing imports it).
-`fs_coil/ledger.py` and `fs_coil/digest.py` are the notify layer's read side (digest outlet, `wayfinder/digest-outlet/map.md`).
+`fs_coil/ledger.py` and `fs_coil/digest.py` are the notify layer's read side (digest outlet, `.wayfinder/digest-outlet/map.md`).
 
 - `cli.py` — argparse-free dispatch. `hook <event>` is the hot path; everything else is human-facing.
 - `hook.py` — reads one Claude Code hook payload from stdin, redacts, appends one NDJSON line. On `Stop`, folds transcript usage into `meta.json`.
@@ -35,7 +35,7 @@ Two packages ship in the wheel: `llmsnitch` (15 modules) and
 - `setup_cmd.py` — prints or writes the Claude Code hooks block. `--write` **refuses to run inside a Claude Code session** (`CLAUDECODE` env set): the monitored agent must not edit its own hook wiring. Snapshots `settings.json` first.
 - `harness.py` / `ingest.py` — multi-harness support per `docs/harness-adapter-contract.md`: declarative registry + lazy ledger-first ingestion with cursors (codex is the first non-Claude harness, T106).
 - `scan.py` / `scanrules.py` — the config-audit surface: rule-pack audit over agent config artifacts; findings route through `fs_coil.notify` as `scan_finding`.
-- `intake.py` / `bulletin.py` / `depaudit.py` — the dep-audit surface (`docs/bulletin-spec.md`, wayfinder/dep-audit): intake extraction from stored sessions, bulletin cache verify/match, and the assembly that gates criticality on `(malicious ∧ intake) ∨ (intake ∧ kev ∧ exercised)`; findings route as `depaudit_finding`. `bulletin.refresh()` fetches the rolling-release bulletin as a `curl` subprocess (`llmsnitch bulletin refresh`; the daily patrol also runs it at `REFRESH_DAYS` age) — the provider that publishes it is developed independently at `~/Repos/llmsnitch-bulletin`, out of this repo.
+- `intake.py` / `bulletin.py` / `depaudit.py` — the dep-audit surface (`docs/bulletin-spec.md`, .wayfinder/dep-audit): intake extraction from stored sessions, bulletin cache verify/match, and the assembly that gates criticality on `(malicious ∧ intake) ∨ (intake ∧ kev ∧ exercised)`; findings route as `depaudit_finding`. `bulletin.refresh()` fetches the rolling-release bulletin as a `curl` subprocess (`llmsnitch bulletin refresh`; the daily patrol also runs it at `REFRESH_DAYS` age) — the provider that publishes it is developed independently at `~/Repos/llmsnitch-bulletin`, out of this repo.
 - `patrol.py` — LaunchAgent plist print/`--write` for the daily unattended scan (`com.slav-it.llmsnitch-patrol`); `scan --patrol` stamps `meta.trigger`.
 - `__init__.py` — `__version__`.
 
@@ -69,4 +69,4 @@ Run one test: there is no framework, just call it — `python3 -c "from tests.te
 - **This repo is local-only.** Never add a remote, never suggest `git push` / GitHub / PRs. (Memory: `llmsnitch-git-local-only`.)
 - **Never run `install.sh`.**
 - **Never use `rm` / `rm -rf`.** Use `trash` (no fallback).
-- Every notification design decision grounds on the map at `wayfinder/map.md` (D01–D27) and the actionability test in `AGENTS.md` — Decision, Actor, Novelty.
+- Every notification design decision grounds on the map at `.wayfinder/map.md` (D01–D27) and the actionability test in `AGENTS.md` — Decision, Actor, Novelty.

@@ -35,7 +35,7 @@ _MAX_STR = 2000   # per-string cap: traces are for auditing, not archiving blobs
 
 # UTR #36 / UAX #9 invisible + bidi + variation-selector + Tag codepoints.
 # Matches Ramparts src/normalize.rs::is_invisible — see
-# docs/research/unicode-evasion-redaction.md for the derivation, benchmarks,
+# .research/unicode-evasion-redaction.md for the derivation, benchmarks,
 # and the honest-limits list (Cyrillic homoglyphs, base64 wrapping, and
 # soft-hyphen splits are documented non-goals).
 _INV_RE = re.compile(

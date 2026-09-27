@@ -9,7 +9,7 @@
 mutation — so reviewing a drift finding never destroys the evidence it
 points at. It is the action every scan_finding page names.
 
-Design: docs/research/scanner-survey-mvp.md Part 2. Five scan types:
+Design: .research/scanner-survey-mvp.md Part 2. Five scan types:
 discovery walk, .claude/ compromise checks, skill-manifest checks,
 secret-shape audit at rest, SHA-256 drift fingerprinting. Findings land as
 NDJSON under <base>/scans/<scan-id>/ exactly like sessions; exit codes

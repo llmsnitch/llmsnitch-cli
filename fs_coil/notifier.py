@@ -30,7 +30,7 @@ _PLIST_LEAD = '[({"-<'   # NSUserDefaults misreads a -message starting with thes
 
 def _click_path():
     """What a click opens: the newest digest's browser twin (.html), or None
-    on the first day (wayfinder/notification-click D01–D03). Derived from the
+    on the first day (.wayfinder/notification-click D01–D03). Derived from the
     directory listing only, never from the banner. Best-effort — monitor.py's
     read loop must never see an exception from here."""
     try:

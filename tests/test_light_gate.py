@@ -1,4 +1,4 @@
-"""fs-coil light through the doctrine gate (wayfinder/quiet-light, T801).
+"""fs-coil light through the doctrine gate (.wayfinder/quiet-light, T801).
 
 Synthetic home and paths only — never the live store or a real subject.
 """

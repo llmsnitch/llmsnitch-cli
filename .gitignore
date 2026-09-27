@@ -5,3 +5,8 @@ build/
 repos/
 .venv/
 *.bundle
+.wayfinder/
+.plans/
+.team/
+.dossiers/
+.research/
