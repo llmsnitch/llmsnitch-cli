@@ -102,10 +102,13 @@ RULES = [
     # the conjunction is the FP suppressor (static `dig example.com` never
     # fires). Anchored lookaheads: search succeeds/fails at position 0 only,
     # so each lookahead is one linear scan (ReDoS discipline, plan 001).
-    # Upstream rates HIGH; compromise-shaped here per T203.
+    # Upstream rates HIGH; compromise-shaped here per T203. The (?<![-\w])
+    # lookbehind keeps flags out of command position: `--host $X` matched the
+    # bare \b (hyphen is a non-word char) — live FP on a fresh machine,
+    # 2026-09-27 field report.
     ("dns_exfil_dynamic_host", _C, "critical",
      ("hook_script", "skill_script"),
-     re.compile(r"^(?=.{0,4096}\b(dig|nslookup|drill|resolvectl|host)\s)"
+     re.compile(r"^(?=.{0,4096}(?<![-\w])(dig|nslookup|drill|resolvectl|host)\s)"
                 r"(?=.{0,4096}(\$\(|`|\$\{?\w))"
                 r"(?=.{0,4096}\.[A-Za-z]{2,})")),
     # -- hygiene (never pages; digest only) ----------------------------------
