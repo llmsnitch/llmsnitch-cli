@@ -8,6 +8,8 @@ from pathlib import Path
 PLIST_LABEL = "com.slav-it.llmsnitch"
 PLIST_PATH = Path(f"/Library/LaunchDaemons/{PLIST_LABEL}.plist")
 BIN_PATH = Path("/usr/local/bin/fs-coil")
+LIGHT_AGENT_LABEL = "com.slav-it.fs-coil"   # user LaunchAgent (light mode):
+                                             # ~/Library/LaunchAgents/<label>.plist
 ESLOGGER = "/usr/bin/eslogger"
 TERMINAL_NOTIFIER = next(
     (p for p in ("/opt/homebrew/bin/terminal-notifier",

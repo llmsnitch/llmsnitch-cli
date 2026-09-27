@@ -114,5 +114,27 @@ def test_usage_lists_new_commands():
         assert s in r.stdout, s
 
 
+def test_status_fresh_machine_collapses_deep():
+    import contextlib, io
+    from pathlib import Path
+    from fs_coil import commands
+    old = commands.PLIST_PATH, commands.BIN_PATH
+    try:
+        commands.PLIST_PATH = Path("/nonexistent/llmsnitch-test.plist")
+        commands.BIN_PATH = Path("/nonexistent/fs-coil-test")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            commands.cmd_status()
+        out = buf.getvalue()
+        assert "deep mode not installed" in out, out
+        assert "/Library/LaunchDaemons" not in out, out
+        assert "light" in out, out          # row KEY only — never assert the
+                                            # light VALUE: the gui-domain
+                                            # launchctl probe is real and
+                                            # machine-dependent
+    finally:
+        commands.PLIST_PATH, commands.BIN_PATH = old
+
+
 if __name__ == "__main__":
     sys.exit(run(globals()))

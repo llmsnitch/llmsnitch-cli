@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fs_coil.constants import BIN_PATH, PLIST_LABEL, PLIST_PATH
+from fs_coil.constants import BIN_PATH, LIGHT_AGENT_LABEL, PLIST_LABEL, PLIST_PATH
 from fs_coil.logger import _colorize_log_line
 from fs_coil.monitor import run_monitor
 from fs_coil.runtime import console_user, user_home
@@ -27,13 +27,27 @@ def require_sudo():
 
 
 def cmd_status():
+    deep_present = PLIST_PATH.exists() or BIN_PATH.exists()
+
     loaded = False
+    if deep_present:
+        if PLIST_PATH.exists():
+            try:
+                out = subprocess.run(
+                    ["/bin/launchctl", "print", f"system/{PLIST_LABEL}"],
+                    capture_output=True, text=True,
+                )
+                loaded = out.returncode == 0
+            except Exception:
+                pass
+
+    light_loaded = False
     try:
-        out = subprocess.run(
-            ["/bin/launchctl", "print", f"system/{PLIST_LABEL}"],
+        lr = subprocess.run(
+            ["/bin/launchctl", "print", f"gui/{os.getuid()}/{LIGHT_AGENT_LABEL}"],
             capture_output=True, text=True,
         )
-        loaded = out.returncode == 0
+        light_loaded = lr.returncode == 0
     except Exception:
         pass
 
@@ -50,9 +64,16 @@ def cmd_status():
             print(f"{_C7}{_TREE_MID}{_R} {_DIM}{k:<9}{_R} {c}{v}{_R}")
         else:
             print(f"  {k:<9} {v}")
-    _kv("plist",    str(PLIST_PATH),  PLIST_PATH.exists())
-    _kv("binary",   str(BIN_PATH),    BIN_PATH.exists())
-    _kv("daemon",   "loaded" if loaded else "not loaded", loaded)
+
+    if deep_present:
+        _kv("plist",  str(PLIST_PATH), PLIST_PATH.exists())
+        _kv("binary", str(BIN_PATH),   BIN_PATH.exists())
+        _kv("daemon", "loaded" if loaded else "not loaded", loaded)
+    else:
+        _kv("daemon", "deep mode not installed (optional — needs root + FDA)", True)
+
+    light_good = light_loaded or loaded
+    _kv("light",    "agent loaded" if light_loaded else "not running (start: fs-coil light)", light_good)
     _kv("user",     user, user != "(none)")
     _kv("log dir",  f"{home}/Library/Logs/llmsnitch/fs-coil")
     _kv("degraded", reason or "none", good=reason is None)
