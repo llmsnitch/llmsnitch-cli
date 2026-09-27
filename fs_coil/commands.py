@@ -26,30 +26,18 @@ def require_sudo():
         sys.exit(1)
 
 
+def _launchctl_ok(target):
+    try:
+        return subprocess.run(["/bin/launchctl", "print", target],
+                              capture_output=True).returncode == 0
+    except Exception:
+        return False
+
+
 def cmd_status():
     deep_present = PLIST_PATH.exists() or BIN_PATH.exists()
-
-    loaded = False
-    if deep_present:
-        if PLIST_PATH.exists():
-            try:
-                out = subprocess.run(
-                    ["/bin/launchctl", "print", f"system/{PLIST_LABEL}"],
-                    capture_output=True, text=True,
-                )
-                loaded = out.returncode == 0
-            except Exception:
-                pass
-
-    light_loaded = False
-    try:
-        lr = subprocess.run(
-            ["/bin/launchctl", "print", f"gui/{os.getuid()}/{LIGHT_AGENT_LABEL}"],
-            capture_output=True, text=True,
-        )
-        light_loaded = lr.returncode == 0
-    except Exception:
-        pass
+    loaded = PLIST_PATH.exists() and _launchctl_ok(f"system/{PLIST_LABEL}")
+    light_loaded = _launchctl_ok(f"gui/{os.getuid()}/{LIGHT_AGENT_LABEL}")
 
     user = console_user() or "(none)"
     home = user_home(user) if user != "(none)" else "~"
@@ -72,8 +60,20 @@ def cmd_status():
     else:
         _kv("daemon", "deep mode not installed (optional — needs root + FDA)", True)
 
-    light_good = light_loaded or loaded
-    _kv("light",    "agent loaded" if light_loaded else "not running (start: fs-coil light)", light_good)
+    light_plist = (Path.home() / "Library" / "LaunchAgents"
+                   / f"{LIGHT_AGENT_LABEL}.plist")
+    if light_loaded:
+        light_val, light_good = "LaunchAgent loaded", True
+    elif loaded:
+        light_val, light_good = "not running (deep mode active — not needed)", True
+    elif light_plist.exists():
+        light_val = (f"not running — launchctl kickstart -k "
+                     f"gui/{os.getuid()}/com.slav-it.fs-coil")
+        light_good = False
+    else:
+        light_val = "not installed — fs-coil light runs the watcher foreground"
+        light_good = False
+    _kv("light",    light_val, light_good)
     _kv("user",     user, user != "(none)")
     _kv("log dir",  f"{home}/Library/Logs/llmsnitch/fs-coil")
     _kv("degraded", reason or "none", good=reason is None)

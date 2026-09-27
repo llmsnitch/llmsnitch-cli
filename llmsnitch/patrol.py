@@ -10,6 +10,7 @@ hook hot path, and never the network.
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 LABEL = "com.slav-it.llmsnitch-patrol"
@@ -45,11 +46,11 @@ def plist():
                          bin=os.path.join(home, ".local", "bin", "llmsnitch"))
 
 
-def run(write, out, plist_path=None):
+def run(write, out, plist_path=None, err=None):
     text = plist()
     if not write:
-        out.write(f"Save as ~/Library/LaunchAgents/{LABEL}.plist "
-                  "(or re-run with --write):\n")
+        (err or sys.stderr).write(f"Save as ~/Library/LaunchAgents/{LABEL}.plist "
+                                  "(or re-run with --write):\n")
         out.write(text)
         return 0
     default = plist_path is None   # overriding the path is the test seam:

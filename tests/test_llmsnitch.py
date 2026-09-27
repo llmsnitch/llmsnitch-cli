@@ -252,9 +252,7 @@ def test_scan_rule_pack_sd020_sd022():
         uq = by_rule.get("hook_unquoted_var", [])
         assert len(uq) == 1, uq   # $PROMPT only; quoted + CLAUDE_* spared
         assert uq[0]["category"] == "scan_hygiene" and uq[0]["severity"] == "low"
-        # hint absent from JSON output
         assert "--waive RULE_ID ARTIFACT" not in buf.getvalue()
-        # hint present in text output (critical dns_exfil_dynamic_host fires)
         tbuf = io.StringIO()
         scan.cmd_scan([str(t / "proj"), "--format", "text"], tbuf)
         assert "--waive RULE_ID ARTIFACT" in tbuf.getvalue(), tbuf.getvalue()
@@ -266,14 +264,14 @@ def test_scan_waive_hint_absent_on_no_critical():
     from llmsnitch import scan
     def body(t):
         cdir = t / "proj" / ".claude"
-        hooks = cdir / "hooks"
-        hooks.mkdir(parents=True)
+        cdir.mkdir(parents=True)
         (cdir / "settings.json").write_text(json.dumps({"hooks": {"Stop": [
             {"hooks": [
                 {"type": "command", "command": "notify-send $PROMPT"},
             ]}]}}))
         tbuf = io.StringIO()
         scan.cmd_scan([str(t / "proj"), "--format", "text"], tbuf)
+        assert "low=1" in tbuf.getvalue(), tbuf.getvalue()
         assert "--waive RULE_ID ARTIFACT" not in tbuf.getvalue(), tbuf.getvalue()
     _with_tmp_store(body)
 
@@ -300,10 +298,10 @@ def test_patrol_plist_print_write_and_refusal():
     import subprocess
     from llmsnitch import patrol
     buf = io.StringIO()
-    assert patrol.run(False, buf) == 0
-    full_out = buf.getvalue()
-    header, xml = full_out.split("\n", 1)
-    assert "(or re-run with --write)" in header, header
+    ebuf = io.StringIO()
+    assert patrol.run(False, buf, err=ebuf) == 0
+    xml = buf.getvalue()
+    assert "(or re-run with --write)" in ebuf.getvalue(), ebuf.getvalue()
     for needle in (patrol.LABEL, "--patrol", "patrol.err",
                    "StartCalendarInterval"):
         assert needle in xml, needle

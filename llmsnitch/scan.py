@@ -753,6 +753,8 @@ def to_text(meta, findings):
     resolved = sum(1 for f in findings if f.get("resolved"))
     if resolved:
         lines.append(f"resolved since last scan: {resolved}")
+    # criticals only: the FP pain that motivated the hint was critical-tier
+    # (2026-09-27 field report); highs are usually true positives.
     if any(not f.get("resolved") and not f.get("waived")
            and f["severity"] == "critical" for f in findings):
         lines.append("reviewed a finding? waive it: llmsnitch scan "

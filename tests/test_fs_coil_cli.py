@@ -116,7 +116,6 @@ def test_usage_lists_new_commands():
 
 def test_status_fresh_machine_collapses_deep():
     import contextlib, io
-    from pathlib import Path
     from fs_coil import commands
     old = commands.PLIST_PATH, commands.BIN_PATH
     try:
