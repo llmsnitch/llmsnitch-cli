@@ -17,11 +17,21 @@ def base_dir():
 
 
 def _mkdir_private(d):
+    """mkdir -p, then 0700 on d and every ancestor down to base_dir() —
+    mkdir(parents=True) creates intermediates at umask default, so a fresh
+    machine's first `scan` left ~/.llmsnitch/scans at 0755 (plan 014's bug,
+    second instance). Never chmods above base_dir (its parent is $HOME)."""
     d.mkdir(parents=True, exist_ok=True)
-    try:
-        os.chmod(d, 0o700)
-    except OSError:
-        pass
+    base = base_dir()
+    p = d
+    while True:
+        try:
+            os.chmod(p, 0o700)
+        except OSError:
+            pass
+        if p == base or base not in p.parents:
+            break
+        p = p.parent
     return d
 
 
