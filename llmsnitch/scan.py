@@ -4,6 +4,7 @@
                  [--fail-on critical|high|medium]
                  [--rebaseline] [--report] [--patrol]
                  [--waive RULE_ID ARTIFACT --reason TEXT]
+                 (ARTIFACT may be an fnmatch glob — quote it; * crosses /)
 
 --report renders the LATEST STORED scan — no re-scan, no baseline
 mutation — so reviewing a drift finding never destroys the evidence it
@@ -18,6 +19,7 @@ over the filesystem; never runs on the hook hot path.
 """
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -43,6 +45,19 @@ _SETTINGS_NAMES = {"settings.json", "settings.local.json",
 _SCRIPT_EXTS = {".py", ".js", ".ts", ".rb", ".ps1", ".sh"}
 
 _HOME = str(Path.home())
+_GLOB_CHARS = "*?["
+
+
+def _waiver_matches(waiver_artifact, artifact):
+    """True if waiver_artifact covers artifact.
+
+    Equality short-circuit is load-bearing: fnmatchcase("a[b]c", "a[b]c")
+    is False, so without it a literal path containing '[' could never be
+    waived again after the first snapshot."""
+    if waiver_artifact == artifact:      # literal always wins —
+        return True                      # bracketed paths stay waivable
+    return (any(c in waiver_artifact for c in _GLOB_CHARS)
+            and fnmatch.fnmatchcase(artifact, waiver_artifact))
 
 
 def _display(path):
@@ -556,21 +571,48 @@ def load_scan_waivers():
 
 
 def _apply_waivers(findings, waivers):
-    """Flag rows whose (rule_id, artifact) carries a waiver: `waived` while
-    the set of matched evidence strings equals the snapshot, `reraised`
-    once it differs (D04 — not file sha, settings.json is rewritten
-    constantly). Drift rows are never waivable: their fingerprint is
-    sha-salted and they always name a decision."""
-    snap = {(w["rule_id"], w["artifact"]): set(w["evidence"]) for w in waivers}
+    """Verdict is per (waiver, artifact) match: equality match → D04 exact
+    branch; glob match → subset branch. Exact-wins-per-match precedence;
+    single flag per finding; drift rows never waivable (plan 018)."""
+    # ponytail: O(waivers × findings) — fine at 8 waivers × ~40 findings.
     cur = {}
     for f in findings:
-        key = (f.get("rule_id"), f.get("artifact"))
-        if key in snap and not key[0].startswith("drift_"):
-            cur.setdefault(key, set()).add(f["evidence"])
+        rid, art = f.get("rule_id"), f.get("artifact")
+        if rid and not rid.startswith("drift_") and art:
+            cur.setdefault((rid, art), set()).add(f["evidence"])
+
+    exact_verdicts = {}   # (rid, art) → bool
+    glob_verdicts  = {}   # (rid, art) → list[bool]  (one per matching waiver)
+
+    for w in waivers:
+        w_rid, w_art = w["rule_id"], w["artifact"]
+        snap_ev = set(w["evidence"])
+
+        for (rid, art), cur_ev in cur.items():
+            if rid != w_rid:
+                continue
+            if not _waiver_matches(w_art, art):
+                continue
+            if art == w_art:   # exact match: D04 equality
+                verdict = (cur_ev == snap_ev)
+                exact_verdicts[(rid, art)] = verdict
+            else:              # glob match: subset rule
+                verdict = cur_ev <= snap_ev
+                glob_verdicts.setdefault((rid, art), []).append(verdict)
+
+    # Exact-wins: assign from exact first, then glob (skipping already decided).
+    decided = {}   # (rid, art) → "waived" | "reraised"
+    for key, v in exact_verdicts.items():
+        decided[key] = "waived" if v else "reraised"
+    for key, verdicts in glob_verdicts.items():
+        if key in decided:
+            continue  # exact already decided
+        decided[key] = "waived" if all(verdicts) else "reraised"
+
     for f in findings:
         key = (f.get("rule_id"), f.get("artifact"))
-        if key in cur:
-            f["waived" if cur[key] == snap[key] else "reraised"] = True
+        if key in decided:
+            f[decided[key]] = True
 
 
 def add_scan_waiver(rule_id, artifact, reason, out):
@@ -584,10 +626,12 @@ def add_scan_waiver(rule_id, artifact, reason, out):
         return 2
     loaded = _load_latest_scan()
     ev = sorted({f["evidence"] for f in (loaded[1] if loaded else [])
-                 if f.get("rule_id") == rule_id and f.get("artifact") == artifact})
+                 if f.get("rule_id") == rule_id
+                 and _waiver_matches(artifact, f.get("artifact", ""))})
     if not ev:
         out.write(f"[ERROR] no finding {rule_id} x {artifact} in the latest "
-                  "stored scan (artifact as `scan --report` prints it)\n")
+                  "stored scan (artifact as `scan --report` prints it; "
+                  "fnmatch globs allowed — quote them, `*` also crosses `/`)\n")
         return 2
     waivers = [w for w in store.waivers_raw()   # dep-audit rows ride along untouched
                if not (isinstance(w, dict) and w.get("surface") == "config-audit"

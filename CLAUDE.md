@@ -49,6 +49,7 @@ pip install -e .                       # dev install; entry point: llmsnitch
 llmsnitch setup                        # print hooks block
 llmsnitch setup --write                # install (from a plain terminal, not inside CC)
 llmsnitch list | show <id> | check     # read-side
+llmsnitch scan --waive RULE_ID ARTIFACT --reason TEXT   # ARTIFACT may be a quoted fnmatch glob
 LLMSNITCH_DIR=/tmp/foo llmsnitch …     # override base dir (used by tests)
 fs-coil digest [--show|--full|--prune|--install-agent]   # daily digest of the notify ledger
 fs-coil noise | prune --target notify | status           # ledger recall, retention, degraded flag

@@ -6,6 +6,7 @@
   llmsnitch check             cost/fail-rate/health gate (exit 0/1/2)
   llmsnitch scan [ROOT ...]   config audit over agent artifacts (exit 0/1/2);
                               --waive RULE_ID ARTIFACT --reason TEXT adds a waiver
+                              (ARTIFACT may be an fnmatch glob — quote it; * crosses /)
   llmsnitch depaudit          intakes x bulletin dep audit (exit 0/1/2);
                               --waive ID PACKAGE --reason TEXT adds a waiver
   llmsnitch bulletin refresh  fetch the bulletin now (the patrol does this weekly)
